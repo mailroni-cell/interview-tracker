@@ -14,7 +14,7 @@ class InterviewApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'מעקב ראיונות עבודה',
+      title: 'Job Tracker Pro',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -23,12 +23,132 @@ class InterviewApp extends StatelessWidget {
       ),
       home: const Directionality(
         textDirection: TextDirection.rtl,
-        child: InterviewListScreen(),
+        child: SplashScreen(),
       ),
     );
   }
 }
 
+// ----------------------------------------------------
+// מסך פתיחה (Splash Screen) עם החותמת של רוני שניידר
+// ----------------------------------------------------
+class SplashScreen extends StatefulWidget {
+  const SplashScreen({super.key});
+
+  @override
+  State<SplashScreen> createState() => _SplashScreenState();
+}
+
+class _SplashScreenState extends State<SplashScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 2200), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const Directionality(
+              textDirection: TextDirection.rtl,
+              child: InterviewListScreen(),
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF4338CA)],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+        ),
+        child: Column(
+          children: [
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.12),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 25,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.work_history_rounded,
+                size: 72,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Job Tracker Pro',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'ניהול ומעקב ראיונות עבודה חכם',
+              style: TextStyle(
+                color: Colors.indigo.shade100,
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+            const SizedBox(height: 36),
+            const SizedBox(
+              width: 32,
+              height: 32,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                color: Colors.white,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              margin: const EdgeInsets.only(bottom: 30),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.25),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.15)),
+              ),
+              child: const Text(
+                'פותח ע"י רוני שניידר • גרסה 1.2',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ----------------------------------------------------
+// מודל נתוני ראיון
+// ----------------------------------------------------
 class InterviewItem {
   String id;
   String company;
@@ -97,6 +217,9 @@ class InterviewItem {
   }
 }
 
+// ----------------------------------------------------
+// המסך הראשי
+// ----------------------------------------------------
 class InterviewListScreen extends StatefulWidget {
   const InterviewListScreen({super.key});
 
@@ -147,7 +270,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     final endTime = item.dateTime.add(const Duration(hours: 1)).millisecondsSinceEpoch;
     final title = Uri.encodeComponent('ראיון (${item.platform}): ${item.company} - ${item.position}');
     final desc = Uri.encodeComponent(
-      'פלטפורמה: ${item.platform}\nאיש קשר: ${item.contactName} ${item.contactPhone}\nקישור/מיקום: ${item.locationOrLink}\nהערות: ${item.notes}',
+      'פלטפורמה: ${item.platform}\nאיש קשר: ${item.contactName} ${item.contactPhone}\nמיקום/קישור: ${item.locationOrLink}\nהערות: ${item.notes}',
     );
     final loc = Uri.encodeComponent(item.locationOrLink);
 
@@ -647,6 +770,9 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
   }
 }
 
+// ----------------------------------------------------
+// מסך הוספת / עריכת ראיון + חילוץ חכם ממייל
+// ----------------------------------------------------
 class InterviewFormScreen extends StatefulWidget {
   final InterviewItem? item;
   const InterviewFormScreen({super.key, this.item});
@@ -714,7 +840,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
           maxLines: 8,
           textAlign: TextAlign.right,
           decoration: const InputDecoration(
-            hintText: 'הדבק כאן את כל ההודעה כפי שנשלחה אליך...',
+            hintText: 'הדבק כאן את תוכן המייל כפי שנשלח אליך...',
             border: OutlineInputBorder(),
           ),
         ),
@@ -737,47 +863,89 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
 
     final lower = rawText.toLowerCase();
 
+    // 1. זיהוי פלטפורמת הפגישה
     if (lower.contains('teams.microsoft.com') || lower.contains('טימס') || lower.contains('teams')) {
       _platform = 'טימס';
     } else if (lower.contains('zoom.us') || lower.contains('זום') || lower.contains('zoom')) {
       _platform = 'זום';
     } else if (lower.contains('meet.google.com') || lower.contains('מיט') || lower.contains('meet')) {
       _platform = 'Google Meet';
-    } else if (lower.contains('במשרד') || lower.contains('קומה') || lower.contains('רחוב') || lower.contains('משרדי')) {
+    } else if (lower.contains('משרדי') || lower.contains('קומה') || lower.contains('רחוב') || lower.contains('כתובת')) {
       _platform = 'פרונטלי';
     }
 
-    final urlRegex = RegExp(r'(https?:\/\/[^\s]+)');
+    // 2. חילוץ קישור לפגישה (URL)
+    final urlRegex = RegExp(r'(https?:\/\/[^\s<>]+)');
     final urlMatch = urlRegex.firstMatch(rawText);
     if (urlMatch != null) {
       _locationController.text = urlMatch.group(0)!;
     }
 
-    final phoneRegex = RegExp(r'(\+?972[-\s]?|0)(5[0-9])[-\s]?([0-9]{3})[-\s]?([0-9]{4})');
+    // 3. חילוץ מספר טלפון ישראלי
+    final phoneRegex = RegExp(r'(05\d[-\s]?\d{3}[-\s]?\d{4}|\+?972[-\s]?5\d[-\s]?\d{3}[-\s]?\d{4})');
     final phoneMatch = phoneRegex.firstMatch(rawText);
     if (phoneMatch != null) {
       _contactPhoneController.text = phoneMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
     }
 
+    // 4. חילוץ שעה ותאריך
+    final timeRegex = RegExp(r'\b([01]?\d|2[0-3]):([0-5]\d)\b');
+    final timeMatch = timeRegex.firstMatch(rawText);
+    
+    final dateRegex = RegExp(r'\b(0?[1-9]|[12]\d|3[01])[\/\.\-](0?[1-9]|1[012])([\/\.\-](\d{2,4}))?\b');
+    final dateMatch = dateRegex.firstMatch(rawText);
+
+    int hour = _dateTime.hour;
+    int minute = _dateTime.minute;
+    if (timeMatch != null) {
+      hour = int.tryParse(timeMatch.group(1)!) ?? hour;
+      minute = int.tryParse(timeMatch.group(2)!) ?? minute;
+    }
+
+    int year = _dateTime.year;
+    int month = _dateTime.month;
+    int day = _dateTime.day;
+    if (dateMatch != null) {
+      day = int.tryParse(dateMatch.group(1)!) ?? day;
+      month = int.tryParse(dateMatch.group(2)!) ?? month;
+      if (dateMatch.group(4) != null) {
+        int y = int.tryParse(dateMatch.group(4)!) ?? year;
+        year = y < 100 ? 2000 + y : y;
+      }
+    }
+
+    try {
+      _dateTime = DateTime(year, month, day, hour, minute);
+    } catch (_) {}
+
+    // 5. חילוץ חברה ותפקיד לפי שורות
     final lines = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
     for (var line in lines) {
-      if (line.contains('חברת') || line.contains('ב-') || line.contains('חברה:')) {
-        final comp = line.replaceAll(RegExp(r'^(חברת|חברה:|ראיון ב-)\s*'), '');
-        if (comp.length < 30) _companyController.text = comp;
+      if (RegExp(r'(תפקיד|משרה|לתפקיד|למשרת|position|role)[:\s]', caseSensitive: false).hasMatch(line)) {
+        final clean = line.replaceAll(RegExp(r'^(תפקיד|משרה|לתפקיד|למשרת|position|role)[:\s\-]+', caseSensitive: false), '').trim();
+        if (clean.isNotEmpty && clean.length < 50) _positionController.text = clean;
       }
-      if (line.contains('תפקיד:') || line.contains('משרת') || line.contains('למשרת')) {
-        final pos = line.replaceAll(RegExp(r'^(תפקיד:|משרת|למשרת)\s*'), '');
-        if (pos.length < 35) _positionController.text = pos;
+      if (RegExp(r'(חברה|חברת|ראיון ב|company)[:\s]', caseSensitive: false).hasMatch(line)) {
+        final clean = line.replaceAll(RegExp(r'^(חברה|חברת|ראיון ב|company)[:\s\-]+', caseSensitive: false), '').trim();
+        if (clean.isNotEmpty && clean.length < 40) _companyController.text = clean;
       }
     }
 
     if (_companyController.text.isEmpty && lines.isNotEmpty) {
-      _companyController.text = lines.first.length > 25 ? lines.first.substring(0, 25) : lines.first;
+      final firstLine = lines.first;
+      if (firstLine.length < 35 && !firstLine.contains('http')) {
+        _companyController.text = firstLine;
+      }
+    }
+
+    // 6. גיבוי הטקסט המלא להערות
+    if (_notesController.text.isEmpty) {
+      _notesController.text = rawText.trim();
     }
 
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('חולצו פרטים בהצלחה! סוג הפגישה הוגדר כ-$_platform')),
+      SnackBar(content: Text('הפרטים חולצו: פלטפורמה $_platform, תאריך ושעה עודכנו!')),
     );
   }
 
