@@ -20,12 +20,6 @@ class InterviewApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
       ),
-      builder: (context, child) {
-        return Directionality(
-          textDirection: TextDirection.RTL,
-          child: child!,
-        );
-      },
       home: const InterviewListScreen(),
     );
   }
