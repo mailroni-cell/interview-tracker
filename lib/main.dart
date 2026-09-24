@@ -5,431 +5,424 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
-  runApp(const InterviewTrackerApp());
+  runApp(const InterviewApp());
 }
 
-class InterviewTrackerApp extends StatelessWidget {
-  const InterviewTrackerApp({super.key});
+class InterviewApp extends StatelessWidget {
+  const InterviewApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'מעקב ראיונות',
+      title: 'מעקב ראיונות עבודה',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
-        colorSchemeSeed: Colors.indigo,
-        brightness: Brightness.dark,
-        fontFamily: 'Roboto',
       ),
-      home: const Directionality(
-        textDirection: TextDirection.rtl,
-        child: HomeScreen(),
-      ),
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child!,
+        );
+      },
+      home: const InterviewListScreen(),
     );
   }
 }
 
-class Interview {
+class InterviewItem {
   String id;
   String company;
-  String role;
+  String position;
   DateTime dateTime;
-  String type;
-  String contact;
-  String locationOrLink;
   String status;
+  String contactName;
+  String contactPhone;
+  String locationOrLink;
   String notes;
 
-  Interview({
+  InterviewItem({
     required this.id,
     required this.company,
-    required this.role,
+    required this.position,
     required this.dateTime,
-    required this.type,
-    required this.contact,
-    required this.locationOrLink,
-    required this.status,
-    required this.notes,
+    this.status = 'נקבע',
+    this.contactName = '',
+    this.contactPhone = '',
+    this.locationOrLink = '',
+    this.notes = '',
   });
 
-  Map<String, dynamic> toMap() => {
-        'id': id,
-        'company': company,
-        'role': role,
-        'dateTime': dateTime.toIso8601String(),
-        'type': type,
-        'contact': contact,
-        'locationOrLink': locationOrLink,
-        'status': status,
-        'notes': notes,
-      };
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'company': company,
+      'position': position,
+      'dateTime': dateTime.toIso8601String(),
+      'status': status,
+      'contactName': contactName,
+      'contactPhone': contactPhone,
+      'locationOrLink': locationOrLink,
+      'notes': notes,
+    };
+  }
 
-  factory Interview.fromMap(Map<String, dynamic> map) => Interview(
-        id: map['id'],
-        company: map['company'],
-        role: map['role'],
-        dateTime: DateTime.parse(map['dateTime']),
-        type: map['type'],
-        contact: map['contact'] ?? '',
-        locationOrLink: map['locationOrLink'] ?? '',
-        status: map['status'] ?? 'נקבע ראיון ראשוני',
-        notes: map['notes'] ?? '',
-      );
+  factory InterviewItem.fromMap(Map<String, dynamic> map) {
+    return InterviewItem(
+      id: map['id'],
+      company: map['company'],
+      position: map['position'],
+      dateTime: DateTime.parse(map['dateTime']),
+      status: map['status'] ?? 'נקבע',
+      contactName: map['contactName'] ?? '',
+      contactPhone: map['contactPhone'] ?? '',
+      locationOrLink: map['locationOrLink'] ?? '',
+      notes: map['notes'] ?? '',
+    );
+  }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class InterviewListScreen extends StatefulWidget {
+  const InterviewListScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<InterviewListScreen> createState() => _InterviewListScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  List<Interview> _interviews = [];
+class _InterviewListScreenState extends State<InterviewListScreen> {
+  List<InterviewItem> _interviews = [];
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadInterviews();
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadInterviews() async {
     final prefs = await SharedPreferences.getInstance();
-    final String? data = prefs.getString('interviews');
+    final String? data = prefs.getString('saved_interviews');
     if (data != null) {
       final List decoded = jsonDecode(data);
       setState(() {
-        _interviews = decoded.map((e) => Interview.fromMap(e)).toList();
+        _interviews = decoded.map((e) => InterviewItem.fromMap(e)).toList();
         _interviews.sort((a, b) => a.dateTime.compareTo(b.dateTime));
       });
     }
   }
 
-  Future<void> _saveData() async {
+  Future<void> _saveInterviews() async {
     final prefs = await SharedPreferences.getInstance();
-    final String encoded = jsonEncode(_interviews.map((e) => e.toMap()).toList());
-    await prefs.setString('interviews', encoded);
+    final encoded = jsonEncode(_interviews.map((e) => e.toMap()).toList());
+    await prefs.setString('saved_interviews', encoded);
   }
 
-  void _addOrEditInterview([Interview? item]) async {
-    final result = await showModalBottomSheet<Interview>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: const Color(0xFF1E1E2E),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: InterviewFormModal(item: item),
+  void _addOrEditInterview([InterviewItem? item]) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InterviewFormScreen(item: item),
       ),
     );
 
-    if (result != null) {
+    if (result != null && result is InterviewItem) {
       setState(() {
-        if (item == null) {
-          _interviews.add(result);
-        } else {
+        if (item != null) {
           final index = _interviews.indexWhere((e) => e.id == item.id);
           if (index != -1) _interviews[index] = result;
+        } else {
+          _interviews.add(result);
         }
         _interviews.sort((a, b) => a.dateTime.compareTo(b.dateTime));
       });
-      _saveData();
+      _saveInterviews();
     }
   }
 
   void _deleteInterview(String id) {
     setState(() {
-      _interviews.removeWhere((e) => e.id == id);
+      _interviews.removeWhere((item) => item.id == id);
     });
-    _saveData();
+    _saveInterviews();
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'עבר בהצלחה':
+        return Colors.green;
+      case 'בוטל/נדחה':
+        return Colors.red;
+      case 'ממתין לתשובה':
+        return Colors.orange;
+      default:
+        return Colors.blue;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final upcoming = _interviews.where((e) => e.dateTime.isAfter(DateTime.now())).toList();
-
     return Scaffold(
-      backgroundColor: const Color(0xFF121218),
       appBar: AppBar(
-        title: const Text('מעקב ראיונות עבודה', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF1E1E2E),
+        title: const Text('מעקב ראיונות עבודה'),
         centerTitle: true,
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
       ),
       body: _interviews.isEmpty
           ? const Center(
               child: Text(
-                'אין עדיין ראיונות ברשימה.\nלחץ על + למטה כדי להוסיף ראיון ראשון!',
+                'אין כרגע ראיונות ברשימה.\nלחץ על הפלוס כדי להוסיף ראיון חדש!',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white60, fontSize: 16),
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             )
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (upcoming.isNotEmpty) ...[
-                  Card(
-                    color: Colors.indigo.shade900.withOpacity(0.6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.timer_outlined, color: Colors.amberAccent, size: 20),
-                              SizedBox(width: 8),
-                              Text('הראיון הקרוב ביותר', style: TextStyle(color: Colors.amberAccent, fontWeight: FontWeight.bold)),
-                            ],
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _interviews.length,
+              itemBuilder: (context, index) {
+                final item = _interviews[index];
+                final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+                return Card(
+                  elevation: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(12),
+                    title: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.company,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                           ),
-                          const SizedBox(height: 10),
-                          Text('${upcoming.first.company} - ${upcoming.first.role}',
-                              style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Text(
-                            DateFormat('EEEE, dd/MM/yyyy HH:mm', 'he').format(upcoming.first.dateTime),
-                            style: const TextStyle(color: Colors.white70),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(item.status).withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        ],
-                      ),
+                          child: Text(
+                            item.status,
+                            style: TextStyle(
+                              color: _getStatusColor(item.status),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 6),
+                        Text('תפקיד: ${item.position}', style: const TextStyle(fontSize: 15)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Text(dateFormat.format(item.dateTime), style: const TextStyle(color: Colors.grey)),
+                          ],
+                        ),
+                        if (item.contactName.isNotEmpty || item.contactPhone.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text('איש קשר: ${item.contactName} (${item.contactPhone})'),
+                        ],
+                        if (item.notes.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text('הערות: ${item.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),
+                        ],
+                      ],
+                    ),
+                    trailing: PopupMenuButton(
+                      onSelected: (val) {
+                        if (val == 'edit') _addOrEditInterview(item);
+                        if (val == 'delete') _deleteInterview(item.id);
+                      },
+                      itemBuilder: (ctx) => [
+                        const PopupMenuItem(value: 'edit', child: Text('ערוך')),
+                        const PopupMenuItem(value: 'delete', child: Text('מחק')),
+                      ],
+                    ),
+                    onTap: () => _addOrEditInterview(item),
                   ),
-                  const SizedBox(height: 16),
-                ],
-                const Text('כל הראיונות', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                ..._interviews.map((item) => _buildInterviewCard(item)),
-              ],
+                );
+              },
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addOrEditInterview(),
-        backgroundColor: Colors.indigoAccent,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('ראיון חדש', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
-
-  Widget _buildInterviewCard(Interview item) {
-    final isUpcoming = item.dateTime.isAfter(DateTime.now());
-
-    return Card(
-      color: const Color(0xFF1E1E2E),
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        title: Text(item.company, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(item.role, style: const TextStyle(color: Colors.indigoAccent, fontSize: 15)),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 14, color: isUpcoming ? Colors.greenAccent : Colors.white38),
-                const SizedBox(width: 6),
-                Text(
-                  DateFormat('dd/MM/yyyy HH:mm').format(item.dateTime),
-                  style: TextStyle(color: isUpcoming ? Colors.greenAccent : Colors.white38),
-                ),
-                const SizedBox(width: 12),
-                Chip(
-                  label: Text(item.status, style: const TextStyle(fontSize: 11, color: Colors.white)),
-                  backgroundColor: Colors.white12,
-                  padding: EdgeInsets.zero,
-                ),
-              ],
-            ),
-            if (item.contact.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text('איש קשר: ${item.contact}', style: const TextStyle(color: Colors.white60, fontSize: 13)),
-            ],
-            if (item.locationOrLink.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              InkWell(
-                onTap: () async {
-                  final uri = Uri.tryParse(item.locationOrLink);
-                  if (uri != null && await canLaunchUrl(uri)) {
-                    await launchUrl(uri);
-                  }
-                },
-                child: Text(
-                  item.locationOrLink,
-                  style: const TextStyle(color: Colors.lightBlueAccent, decoration: TextDecoration.underline, fontSize: 13),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-            if (item.notes.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text('דגשים: ${item.notes}', style: const TextStyle(color: Colors.amberAccent, fontSize: 12)),
-            ]
-          ],
-        ),
-        trailing: PopupMenuButton(
-          icon: const Icon(Icons.more_vert, color: Colors.white60),
-          itemBuilder: (ctx) => [
-            const PopupMenuItem(value: 'edit', child: Text('ערוך')),
-            const PopupMenuItem(value: 'delete', child: Text('מחק', style: TextStyle(color: Colors.redAccent))),
-          ],
-          onSelected: (val) {
-            if (val == 'edit') _addOrEditInterview(item);
-            if (val == 'delete') _deleteInterview(item.id);
-          },
-        ),
+        icon: const Icon(Icons.add),
+        label: const Text('ראיון חדש'),
       ),
     );
   }
 }
 
-class InterviewFormModal extends StatefulWidget {
-  final Interview? item;
-  const InterviewFormModal({super.key, this.item});
+class InterviewFormScreen extends StatefulWidget {
+  final InterviewItem? item;
+  const InterviewFormScreen({super.key, this.item});
 
   @override
-  State<InterviewFormModal> createState() => _InterviewFormModalState();
+  State<InterviewFormScreen> createState() => _InterviewFormScreenState();
 }
 
-class _InterviewFormModalState extends State<InterviewFormModal> {
+class _InterviewFormScreenState extends State<InterviewFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late String _company;
-  late String _role;
+  late String _position;
   late DateTime _dateTime;
-  late String _type;
-  late String _contact;
-  late String _locationOrLink;
   late String _status;
+  late String _contactName;
+  late String _contactPhone;
+  late String _locationOrLink;
   late String _notes;
+
+  final List<String> _statusOptions = [
+    'נקבע',
+    'התקיים',
+    'ממתין לתשובה',
+    'עבר בהצלחה',
+    'בוטל/נדחה',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _company = widget.item?.company ?? '';
-    _role = widget.item?.role ?? '';
-    _dateTime = widget.item?.dateTime ?? DateTime.now().add(const Duration(days: 1));
-    _type = widget.item?.type ?? 'זום';
-    _contact = widget.item?.contact ?? '';
-    _locationOrLink = widget.item?.locationOrLink ?? '';
-    _status = widget.item?.status ?? 'נקבע ראיון ראשוני';
-    _notes = widget.item?.notes ?? '';
+    final item = widget.item;
+    _company = item?.company ?? '';
+    _position = item?.position ?? '';
+    _dateTime = item?.dateTime ?? DateTime.now().add(const Duration(days: 1));
+    _status = item?.status ?? 'נקבע';
+    _contactName = item?.contactName ?? '';
+    _contactPhone = item?.contactPhone ?? '';
+    _locationOrLink = item?.locationOrLink ?? '';
+    _notes = item?.notes ?? '';
+  }
+
+  Future<void> _pickDateTime() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _dateTime,
+      firstDate: DateTime(2024),
+      lastDate: DateTime(2030),
+    );
+    if (pickedDate == null) return;
+
+    if (!mounted) return;
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_dateTime),
+    );
+    if (pickedTime == null) return;
+
+    setState(() {
+      _dateTime = DateTime(
+        pickedDate.year,
+        pickedDate.month,
+        pickedDate.day,
+        pickedTime.hour,
+        pickedTime.minute,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        top: 20,
-        left: 20,
-        right: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.item == null ? 'הוספת ראיון' : 'עריכת ראיון'),
       ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                widget.item == null ? 'הוספת ראיון חדש' : 'עריכת ראיון',
-                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
               TextFormField(
                 initialValue: _company,
-                decoration: const InputDecoration(labelText: 'שם החברה', border: OutlineInputBorder()),
-                validator: (val) => val == null || val.isEmpty ? 'נא להזין חברה' : null,
-                onSaved: (val) => _company = val!,
+                decoration: const InputDecoration(labelText: 'שם החברה *', border: OutlineInputBorder()),
+                validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
+                onSaved: (val) => _company = val!.trim(),
               ),
               const SizedBox(height: 12),
               TextFormField(
-                initialValue: _role,
-                decoration: const InputDecoration(labelText: 'תפקיד', border: OutlineInputBorder()),
-                validator: (val) => val == null || val.isEmpty ? 'נא להזין תפקיד' : null,
-                onSaved: (val) => _role = val!,
+                initialValue: _position,
+                decoration: const InputDecoration(labelText: 'תפקיד *', border: OutlineInputBorder()),
+                validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
+                onSaved: (val) => _position = val!.trim(),
               ),
               const SizedBox(height: 12),
               ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('מועד: ${DateFormat('dd/MM/yyyy HH:mm').format(_dateTime)}'),
-                trailing: const Icon(Icons.edit_calendar, color: Colors.indigoAccent),
-                onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: _dateTime,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2035),
-                  );
-                  if (date != null) {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(_dateTime),
-                    );
-                    if (time != null) {
-                      setState(() {
-                        _dateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-                      });
-                    }
-                  }
-                },
+                tileColor: Colors.grey.shade100,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                leading: const Icon(Icons.calendar_today),
+                title: Text('מועד הראיון: ${dateFormat.format(_dateTime)}'),
+                trailing: TextButton(
+                  onPressed: _pickDateTime,
+                  child: const Text('שנה מועד'),
+                ),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _status,
                 decoration: const InputDecoration(labelText: 'סטטוס', border: OutlineInputBorder()),
-                items: ['נקבע ראיון ראשוני', 'ראיון טכני', 'ראיון הנהלה', 'ממתין לתשובה', 'התקבלה הצעה', 'לא רלוונטי']
+                items: _statusOptions
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
                 onChanged: (val) => setState(() => _status = val!),
               ),
               const SizedBox(height: 12),
               TextFormField(
-                initialValue: _contact,
-                decoration: const InputDecoration(labelText: 'איש קשר / טלפון', border: OutlineInputBorder()),
-                onSaved: (val) => _contact = val ?? '',
+                initialValue: _contactName,
+                decoration: const InputDecoration(labelText: 'שם איש קשר / מגייסת', border: OutlineInputBorder()),
+                onSaved: (val) => _contactName = val?.trim() ?? '',
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                initialValue: _contactPhone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'טלפון איש קשר', border: OutlineInputBorder()),
+                onSaved: (val) => _contactPhone = val?.trim() ?? '',
               ),
               const SizedBox(height: 12),
               TextFormField(
                 initialValue: _locationOrLink,
-                decoration: const InputDecoration(labelText: 'קישור לשיחה או כתובת', border: OutlineInputBorder()),
-                onSaved: (val) => _locationOrLink = val ?? '',
+                decoration: const InputDecoration(labelText: 'מיקום / קישור ל-Zoom או Teams', border: OutlineInputBorder()),
+                onSaved: (val) => _locationOrLink = val?.trim() ?? '',
               ),
               const SizedBox(height: 12),
               TextFormField(
                 initialValue: _notes,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'דגשים והערות לחזרה', border: OutlineInputBorder()),
-                onSaved: (val) => _notes = val ?? '',
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'הערות ודגשים לקראת הראיון', border: OutlineInputBorder()),
+                onSaved: (val) => _notes = val?.trim() ?? '',
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(50),
-                  backgroundColor: Colors.indigoAccent,
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      _formKey.currentState!.save();
+                      final newItem = InterviewItem(
+                        id: widget.item?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                        company: _company,
+                        position: _position,
+                        dateTime: _dateTime,
+                        status: _status,
+                        contactName: _contactName,
+                        contactPhone: _contactPhone,
+                        locationOrLink: _locationOrLink,
+                        notes: _notes,
+                      );
+                      Navigator.pop(context, newItem);
+                    }
+                  },
+                  child: const Text('שמור ראיון', style: TextStyle(fontSize: 16)),
                 ),
-                onPressed: () {
-                  if (_formKey.currentState!.validate()) {
-                    _formKey.currentState!.save();
-                    final item = Interview(
-                      id: widget.item?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                      company: _company,
-                      role: _role,
-                      dateTime: _dateTime,
-                      type: _type,
-                      contact: _contact,
-                      locationOrLink: _locationOrLink,
-                      status: _status,
-                      notes: _notes,
-                    );
-                    Navigator.pop(context, item);
-                  }
-                },
-                child: const Text('שמור ראיון', style: TextStyle(color: Colors.white, fontSize: 16)),
               ),
             ],
           ),
