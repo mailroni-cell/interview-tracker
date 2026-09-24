@@ -19,9 +19,12 @@ class InterviewApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: Colors.indigo,
-        scaffoldBackgroundColor: const Color(0xFFF8F9FD),
+        scaffoldBackgroundColor: const Color(0xFFF4F6FA),
       ),
-      home: const InterviewListScreen(),
+      home: const Directionality(
+        textDirection: TextDirection.rtl,
+        child: InterviewListScreen(),
+      ),
     );
   }
 }
@@ -145,7 +148,10 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => InterviewFormScreen(item: item),
+        builder: (context) => Directionality(
+          textDirection: TextDirection.rtl,
+          child: InterviewFormScreen(item: item),
+        ),
       ),
     );
 
@@ -173,14 +179,169 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'עבר בהצלחה':
-        return Colors.green.shade600;
+        return const Color(0xFF10B981);
       case 'בוטל/נדחה':
-        return Colors.red.shade600;
+        return const Color(0xFFEF4444);
       case 'ממתין לתשובה':
-        return Colors.orange.shade800;
+        return const Color(0xFFF59E0B);
+      case 'התקיים':
+        return const Color(0xFF6366F1);
       default:
-        return Colors.indigo.shade600;
+        return const Color(0xFF3B82F6);
     }
+  }
+
+  Widget _buildDashboard() {
+    final total = _interviews.length;
+    final success = _interviews.where((i) => i.status == 'עבר בהצלחה').length;
+    final pending = _interviews.where((i) => i.status == 'ממתין לתשובה' || i.status == 'נקבע').length;
+    final rejected = _interviews.where((i) => i.status == 'בוטל/נדחה').length;
+
+    final successRate = total > 0 ? ((success / total) * 100).toStringAsFixed(0) : '0';
+
+    InterviewItem? nextInterview;
+    final now = DateTime.now();
+    for (var item in _interviews) {
+      if (item.dateTime.isAfter(now)) {
+        nextInterview = item;
+        break;
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'לוח בקרה ומדדים',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'הצלחה: $successRate%',
+                  style: TextStyle(color: Colors.indigo.shade700, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _buildStatCard('סך הכול', total.toString(), Icons.folder_open_rounded, Colors.blue),
+              const SizedBox(width: 8),
+              _buildStatCard('בתהליך', pending.toString(), Icons.hourglass_top_rounded, Colors.orange),
+              const SizedBox(width: 8),
+              _buildStatCard('הצלחה', success.toString(), Icons.check_circle_outline_rounded, Colors.green),
+              const SizedBox(width: 8),
+              _buildStatCard('נדחה', rejected.toString(), Icons.cancel_outlined, Colors.red),
+            ],
+          ),
+          if (total > 0) ...[
+            const SizedBox(height: 16),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 8,
+                child: Row(
+                  children: [
+                    if (success > 0)
+                      Expanded(flex: success, child: Container(color: const Color(0xFF10B981))),
+                    if (pending > 0)
+                      Expanded(flex: pending, child: Container(color: const Color(0xFFF59E0B))),
+                    if (rejected > 0)
+                      Expanded(flex: rejected, child: Container(color: const Color(0xFFEF4444))),
+                    if (total - (success + pending + rejected) > 0)
+                      Expanded(
+                        flex: total - (success + pending + rejected),
+                        child: Container(color: const Color(0xFF6366F1)),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          if (nextInterview != null) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.indigo.shade100),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.alarm_on_rounded, color: Colors.indigo.shade600, size: 24),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'הראיון הבא: ${nextInterview.company}',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                        Text(
+                          DateFormat('dd/MM/yyyy • HH:mm').format(nextInterview.dateTime),
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String title, String count, IconData icon, MaterialColor color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color.shade50,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color.shade700, size: 20),
+            const SizedBox(height: 4),
+            Text(
+              count,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color.shade900),
+            ),
+            Text(
+              title,
+              style: TextStyle(fontSize: 11, color: color.shade700, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -192,179 +353,190 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
         title: const Text('מעקב ראיונות עבודה', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.white,
-        elevation: 1,
+        elevation: 0.5,
       ),
-      body: _interviews.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.event_note_outlined, size: 70, color: Colors.indigo.shade200),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'אין ראיונות שמורים כרגע',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'לחץ על הכפתור למטה כדי להוסיף ראיון חדש',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
+      body: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: _buildDashboard(),
+          ),
+          if (_interviews.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.event_note_outlined, size: 64, color: Colors.indigo.shade200),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'אין ראיונות שמורים כרגע',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text('הוסף ראיון כדי להפעיל את לוח המדדים', style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
               ),
             )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: _interviews.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final item = _interviews[index];
-                final statusColor = _getStatusColor(item.status);
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final item = _interviews[index];
+                    final statusColor = _getStatusColor(item.status);
 
-                return Card(
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: BorderSide(color: Colors.grey.shade200),
-                  ),
-                  color: Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Row(
+                    return Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.indigo.shade50,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Icon(Icons.business_rounded, color: Colors.indigo.shade700, size: 28),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.company,
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.indigo.shade50,
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
-                                  const SizedBox(height: 2),
+                                  child: Icon(Icons.business_rounded, color: Colors.indigo.shade700, size: 26),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        item.company,
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                                      ),
+                                      Text(
+                                        item.position,
+                                        style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: statusColor.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    item.status,
+                                    style: TextStyle(
+                                      color: statusColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 22),
+                            Row(
+                              children: [
+                                Icon(Icons.calendar_today_rounded, size: 15, color: Colors.indigo.shade400),
+                                const SizedBox(width: 6),
+                                Text(
+                                  dateFormat.format(item.dateTime),
+                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                ),
+                              ],
+                            ),
+                            if (item.contactName.isNotEmpty || item.contactPhone.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.person_outline_rounded, size: 15, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    item.position,
-                                    style: TextStyle(fontSize: 15, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                    '${item.contactName} ${item.contactPhone.isNotEmpty ? '• ${item.contactPhone}' : ''}',
+                                    style: TextStyle(color: Colors.grey.shade800, fontSize: 13),
                                   ),
                                 ],
                               ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: statusColor.withOpacity(0.12),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                item.status,
-                                style: TextStyle(
-                                  color: statusColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 24),
-                        Row(
-                          children: [
-                            Icon(Icons.calendar_today_rounded, size: 16, color: Colors.indigo.shade400),
-                            const SizedBox(width: 6),
-                            Text(
-                              dateFormat.format(item.dateTime),
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                            ),
-                          ],
-                        ),
-                        if (item.contactName.isNotEmpty || item.contactPhone.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(Icons.person_outline_rounded, size: 16, color: Colors.grey.shade600),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${item.contactName} ${item.contactPhone.isNotEmpty ? '• ${item.contactPhone}' : ''}',
-                                style: TextStyle(color: Colors.grey.shade800, fontSize: 13),
+                            ],
+                            if (item.locationOrLink.isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.place_outlined, size: 15, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      item.locationOrLink,
+                                      style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
-                          ),
-                        ],
-                        if (item.locationOrLink.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(Icons.place_outlined, size: 16, color: Colors.grey.shade600),
-                              const SizedBox(width: 6),
-                              Expanded(
+                            if (item.notes.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                                 child: Text(
-                                  item.locationOrLink,
+                                  item.notes,
                                   style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
-                          ),
-                        ],
-                        if (item.notes.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              item.notes,
-                              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
-                          children: [
-                            TextButton.icon(
-                              onPressed: () => _addToCalendar(item),
-                              icon: const Icon(Icons.event_available_rounded, size: 18),
-                              label: const Text('ליומן'),
-                            ),
-                            if (item.contactPhone.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.phone_rounded, color: Colors.green),
-                                tooltip: 'התקשר',
-                                onPressed: () => _callPhone(item.contactPhone),
-                              ),
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined),
-                              tooltip: 'ערוך',
-                              onPressed: () => _addOrEditInterview(item),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
-                              tooltip: 'מחק',
-                              onPressed: () => _deleteInterview(item.id),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () => _addToCalendar(item),
+                                  icon: const Icon(Icons.event_available_rounded, size: 18),
+                                  label: const Text('ליומן'),
+                                ),
+                                if (item.contactPhone.isNotEmpty)
+                                  IconButton(
+                                    icon: const Icon(Icons.phone_rounded, color: Colors.green),
+                                    tooltip: 'התקשר',
+                                    onPressed: () => _callPhone(item.contactPhone),
+                                  ),
+                                IconButton(
+                                  icon: const Icon(Icons.edit_outlined),
+                                  tooltip: 'ערוך',
+                                  onPressed: () => _addOrEditInterview(item),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                  tooltip: 'מחק',
+                                  onPressed: () => _deleteInterview(item.id),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              },
+                      ),
+                    );
+                  },
+                  childCount: _interviews.length,
+                ),
+              ),
             ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addOrEditInterview(),
         backgroundColor: Colors.indigo,
@@ -465,8 +637,9 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'שם החברה *',
+                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.business),
+                  suffixIcon: Icon(Icons.business),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
                 onSaved: (val) => _company = val!.trim(),
@@ -477,8 +650,9 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'תפקיד *',
+                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.work_outline),
+                  suffixIcon: Icon(Icons.work_outline),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
                 onSaved: (val) => _position = val!.trim(),
@@ -518,13 +692,20 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 value: _status,
+                isExpanded: true,
+                alignment: AlignmentDirectional.centerStart,
                 decoration: const InputDecoration(
                   labelText: 'סטטוס',
+                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.flag_outlined),
+                  suffixIcon: Icon(Icons.flag_outlined),
                 ),
                 items: _statusOptions
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                    .map((s) => DropdownMenuItem(
+                          value: s,
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Text(s, textAlign: TextAlign.right),
+                        ))
                     .toList(),
                 onChanged: (val) => setState(() => _status = val!),
               ),
@@ -534,8 +715,9 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'איש / אשת קשר',
+                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person_outline),
+                  suffixIcon: Icon(Icons.person_outline),
                 ),
                 onSaved: (val) => _contactName = val?.trim() ?? '',
               ),
@@ -546,8 +728,9 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'טלפון איש קשר',
+                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.phone_outlined),
+                  suffixIcon: Icon(Icons.phone_outlined),
                 ),
                 onSaved: (val) => _contactPhone = val?.trim() ?? '',
               ),
@@ -557,8 +740,9 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'מיקום פיזי / קישור לפגישה (Zoom, Teams)',
+                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.link_rounded),
+                  suffixIcon: Icon(Icons.link_rounded),
                 ),
                 onSaved: (val) => _locationOrLink = val?.trim() ?? '',
               ),
@@ -571,7 +755,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                   labelText: 'דגשים, ציפיות שכר והערות',
                   border: OutlineInputBorder(),
                   alignLabelWithHint: true,
-                  prefixIcon: Icon(Icons.note_alt_outlined),
+                  suffixIcon: Icon(Icons.note_alt_outlined),
                 ),
                 onSaved: (val) => _notes = val?.trim() ?? '',
               ),
