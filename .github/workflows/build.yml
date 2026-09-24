@@ -20,25 +20,34 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.5'
           channel: 'stable'
 
-      - name: Create Clean Skeleton
+      - name: Build Full App
         run: |
-          mkdir -p ../temp_app
-          cd ../temp_app
-          flutter create --platforms=android --org com.interviewtracker app
-          cp -r app/android $GITHUB_WORKSPACE/
-          cd $GITHUB_WORKSPACE
+          # שמירת קובץ הקוד הראשי בצד
+          cp lib/main.dart /tmp/main.dart
 
-      - name: Get Dependencies
-        run: flutter pub get
+          # יצירת פרויקט Flutter מלא ותקני מאפס
+          cd ..
+          rm -rf interview-tracker
+          flutter create --org com.interviewtracker --project-name interview_tracker interview-tracker
+          cd interview-tracker
 
-      - name: Build Debug APK
-        run: flutter build apk --debug
+          # החזרת קובץ ה-Dart שלנו
+          cp /tmp/main.dart lib/main.dart
+
+          # הוספת הספריות הנחוצות ישירות לפרויקט
+          flutter pub add intl shared_preferences url_launcher
+
+          # בניית קובץ ה-APK
+          flutter build apk --debug
+
+          # העתקת ה-APK המוכן לתיקיית העבודה
+          mkdir -p $GITHUB_WORKSPACE/output
+          cp build/app/outputs/flutter-apk/app-debug.apk $GITHUB_WORKSPACE/output/
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: output/app-debug.apk
