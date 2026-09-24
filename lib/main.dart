@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -30,7 +31,7 @@ class InterviewApp extends StatelessWidget {
 }
 
 // ----------------------------------------------------
-// מסך פתיחה (Splash Screen) עם החותמת של רוני שניידר
+// מסך פתיחה - מוצג למשך 5 שניות מלאות
 // ----------------------------------------------------
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -43,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 2200), () {
+    Future.delayed(const Duration(milliseconds: 5000), () {
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -74,7 +75,7 @@ class _SplashScreenState extends State<SplashScreen> {
           children: [
             const Spacer(),
             Container(
-              padding: const EdgeInsets.all(22),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
                 color: Colors.white.withOpacity(0.12),
                 shape: BoxShape.circle,
@@ -88,7 +89,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
               child: const Icon(
                 Icons.work_history_rounded,
-                size: 72,
+                size: 76,
                 color: Colors.white,
               ),
             ),
@@ -97,7 +98,7 @@ class _SplashScreenState extends State<SplashScreen> {
               'Job Tracker Pro',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: 30,
+                fontSize: 32,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 1.1,
               ),
@@ -123,7 +124,7 @@ class _SplashScreenState extends State<SplashScreen> {
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              margin: const EdgeInsets.only(bottom: 30),
+              margin: const EdgeInsets.only(bottom: 36),
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.25),
                 borderRadius: BorderRadius.circular(20),
@@ -147,7 +148,7 @@ class _SplashScreenState extends State<SplashScreen> {
 }
 
 // ----------------------------------------------------
-// מודל נתוני ראיון
+// מודל נתוני הראיון
 // ----------------------------------------------------
 class InterviewItem {
   String id;
@@ -218,7 +219,7 @@ class InterviewItem {
 }
 
 // ----------------------------------------------------
-// המסך הראשי
+// המסך הראשי ודשבורד המדדים
 // ----------------------------------------------------
 class InterviewListScreen extends StatefulWidget {
   const InterviewListScreen({super.key});
@@ -559,7 +560,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                     const SizedBox(height: 12),
                     const Text('אין ראיונות ברשימה', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    const Text('לחץ למטה והדבק זימון ישירות מהמייל!', style: TextStyle(color: Colors.grey)),
+                    const Text('העתק זימון מהמייל ולחץ על ראיון חדש!', style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
@@ -748,11 +749,16 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
             ),
           const SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.only(top: 20, bottom: 90),
+              padding: EdgeInsets.only(top: 24, bottom: 120),
               child: Center(
                 child: Text(
                   'פותח ע"י רוני שניידר • גרסה 1.2',
-                  style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ),
@@ -771,7 +777,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
 }
 
 // ----------------------------------------------------
-// מסך הוספת / עריכת ראיון + חילוץ חכם ממייל
+// טופס ראיון + כפתור משיכה מהירה מה-Clipboard
 // ----------------------------------------------------
 class InterviewFormScreen extends StatefulWidget {
   final InterviewItem? item;
@@ -829,69 +835,57 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
     super.dispose();
   }
 
-  void _showPasteDialog() {
-    final textController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('הדבק תוכן זימון ממייל/וואטסאפ'),
-        content: TextField(
-          controller: textController,
-          maxLines: 8,
-          textAlign: TextAlign.right,
-          decoration: const InputDecoration(
-            hintText: 'הדבק כאן את תוכן המייל כפי שנשלח אליך...',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ביטול')),
-          FilledButton(
-            onPressed: () {
-              _parseEmailText(textController.text);
-              Navigator.pop(ctx);
-            },
-            child: const Text('חלץ פרטים אוטומטית'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _fetchAndParseFromClipboard() async {
+    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+    final text = clipboardData?.text ?? '';
+
+    if (text.trim().isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('לא נמצא טקסט מועתק. העתק את הזימון מהמייל תחילה!')),
+      );
+      return;
+    }
+
+    _parseEmailText(text);
   }
 
   void _parseEmailText(String rawText) {
-    if (rawText.trim().isEmpty) return;
-
     final lower = rawText.toLowerCase();
 
-    // 1. זיהוי פלטפורמת הפגישה
+    // 1. זיהוי פלטפורמה
     if (lower.contains('teams.microsoft.com') || lower.contains('טימס') || lower.contains('teams')) {
       _platform = 'טימס';
     } else if (lower.contains('zoom.us') || lower.contains('זום') || lower.contains('zoom')) {
       _platform = 'זום';
     } else if (lower.contains('meet.google.com') || lower.contains('מיט') || lower.contains('meet')) {
       _platform = 'Google Meet';
-    } else if (lower.contains('משרדי') || lower.contains('קומה') || lower.contains('רחוב') || lower.contains('כתובת')) {
+    } else if (lower.contains('במשרד') || lower.contains('קומה') || lower.contains('רחוב') || lower.contains('כתובת')) {
       _platform = 'פרונטלי';
     }
 
-    // 2. חילוץ קישור לפגישה (URL)
-    final urlRegex = RegExp(r'(https?:\/\/[^\s<>]+)');
-    final urlMatch = urlRegex.firstMatch(rawText);
-    if (urlMatch != null) {
-      _locationController.text = urlMatch.group(0)!;
+    // 2. קישור לפגישה
+    final urlRegex = RegExp(r'(https?:\/\/[^\s<>"\)]+)');
+    final urlMatches = urlRegex.allMatches(rawText);
+    for (final match in urlMatches) {
+      final url = match.group(0)!;
+      if (url.contains('teams') || url.contains('zoom') || url.contains('meet') || _locationController.text.isEmpty) {
+        _locationController.text = url;
+        if (url.contains('teams') || url.contains('zoom') || url.contains('meet')) break;
+      }
     }
 
-    // 3. חילוץ מספר טלפון ישראלי
-    final phoneRegex = RegExp(r'(05\d[-\s]?\d{3}[-\s]?\d{4}|\+?972[-\s]?5\d[-\s]?\d{3}[-\s]?\d{4})');
+    // 3. טלפון ישראלי
+    final phoneRegex = RegExp(r'(05\d[-\s]?\d{3}[-\s]?\d{4}|\+?972[-\s]?5\d[-\s]?\d{3}[-\s]?\d{4}|0[23489][-\s]?\d{7})');
     final phoneMatch = phoneRegex.firstMatch(rawText);
     if (phoneMatch != null) {
       _contactPhoneController.text = phoneMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
     }
 
-    // 4. חילוץ שעה ותאריך
-    final timeRegex = RegExp(r'\b([01]?\d|2[0-3]):([0-5]\d)\b');
+    // 4. שעה ותאריך
+    final timeRegex = RegExp(r'\b([01]?\d|2[0-3])[:.]([0-5]\d)\b');
     final timeMatch = timeRegex.firstMatch(rawText);
-    
+
     final dateRegex = RegExp(r'\b(0?[1-9]|[12]\d|3[01])[\/\.\-](0?[1-9]|1[012])([\/\.\-](\d{2,4}))?\b');
     final dateMatch = dateRegex.firstMatch(rawText);
 
@@ -918,34 +912,44 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
       _dateTime = DateTime(year, month, day, hour, minute);
     } catch (_) {}
 
-    // 5. חילוץ חברה ותפקיד לפי שורות
-    final lines = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    // 5. חילוץ חברה ותפקיד
+    final lines = rawText
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty && !l.startsWith('http'))
+        .toList();
+
     for (var line in lines) {
-      if (RegExp(r'(תפקיד|משרה|לתפקיד|למשרת|position|role)[:\s]', caseSensitive: false).hasMatch(line)) {
+      if (RegExp(r'(תפקיד|משרה|לתפקיד|למשרת|position|role)[:\s\-]', caseSensitive: false).hasMatch(line)) {
         final clean = line.replaceAll(RegExp(r'^(תפקיד|משרה|לתפקיד|למשרת|position|role)[:\s\-]+', caseSensitive: false), '').trim();
         if (clean.isNotEmpty && clean.length < 50) _positionController.text = clean;
       }
-      if (RegExp(r'(חברה|חברת|ראיון ב|company)[:\s]', caseSensitive: false).hasMatch(line)) {
-        final clean = line.replaceAll(RegExp(r'^(חברה|חברת|ראיון ב|company)[:\s\-]+', caseSensitive: false), '').trim();
+      if (RegExp(r'(חברה|חברת|ראיון ב|ראיון בחברת|company|interview with)[:\s\-]', caseSensitive: false).hasMatch(line)) {
+        final clean = line.replaceAll(RegExp(r'^(חברה|חברת|ראיון ב|ראיון בחברת|company|interview with)[:\s\-]+', caseSensitive: false), '').trim();
         if (clean.isNotEmpty && clean.length < 40) _companyController.text = clean;
+      }
+      if (RegExp(r'(מראיין|מראיינת|איש קשר|hr|recruiter)[:\s\-]', caseSensitive: false).hasMatch(line)) {
+        final clean = line.replaceAll(RegExp(r'^(מראיין|מראיינת|איש קשר|hr|recruiter)[:\s\-]+', caseSensitive: false), '').trim();
+        if (clean.isNotEmpty && clean.length < 30) _contactNameController.text = clean;
       }
     }
 
     if (_companyController.text.isEmpty && lines.isNotEmpty) {
-      final firstLine = lines.first;
-      if (firstLine.length < 35 && !firstLine.contains('http')) {
-        _companyController.text = firstLine;
+      for (var l in lines) {
+        if (!l.contains('שלום') && !l.contains('היי') && !l.contains(':') && l.length < 30) {
+          _companyController.text = l;
+          break;
+        }
       }
     }
 
-    // 6. גיבוי הטקסט המלא להערות
     if (_notesController.text.isEmpty) {
       _notesController.text = rawText.trim();
     }
 
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('הפרטים חולצו: פלטפורמה $_platform, תאריך ושעה עודכנו!')),
+      SnackBar(content: Text('הפרטים נשאבו מהמייל! פלטפורמה: $_platform')),
     );
   }
 
@@ -992,16 +996,18 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF4338CA),
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  foregroundColor: Colors.indigo,
-                  side: const BorderSide(color: Colors.indigo, width: 1.5),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                onPressed: _showPasteDialog,
-                icon: const Icon(Icons.auto_fix_high_rounded),
-                label: const Text('הדבק זימון ממייל / וואטסאפ (חילוץ אוטומטי)', style: TextStyle(fontWeight: FontWeight.bold)),
+                onPressed: _fetchAndParseFromClipboard,
+                icon: const Icon(Icons.flash_on_rounded, color: Colors.amberAccent),
+                label: const Text(
+                  'שאב נתונים אוטומטית ממה שהעתקת מהמייל',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -1156,7 +1162,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _notesController,
-                maxLines: 2,
+                maxLines: 3,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'דגשים והערות',
