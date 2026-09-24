@@ -22,7 +22,7 @@ class InterviewApp extends StatelessWidget {
       ),
       builder: (context, child) {
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: TextDirection.RTL,
           child: child!,
         );
       },
