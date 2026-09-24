@@ -27,8 +27,8 @@ jobs:
         run: |
           mkdir -p ../temp_app
           cd ../temp_app
-          flutter create --platforms=android --org com.interviewtracker interview_tracker
-          cp -r android $GITHUB_WORKSPACE/
+          flutter create --platforms=android --org com.interviewtracker app
+          cp -r app/android $GITHUB_WORKSPACE/
           cd $GITHUB_WORKSPACE
 
       - name: Get Dependencies
