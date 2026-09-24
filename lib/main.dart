@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -16,9 +17,40 @@ class InterviewApp extends StatelessWidget {
     return MaterialApp(
       title: 'מעקב ראיונות עבודה',
       debugShowCheckedModeBanner: false,
+      locale: const Locale('he', 'IL'),
+      supportedLocales: const [
+        Locale('he', 'IL'),
+        Locale('en', 'US'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
         useMaterial3: true,
+        colorSchemeSeed: Colors.indigo,
+        scaffoldBackgroundColor: const Color(0xFFF8F9FD),
+        cardTheme: CardTheme(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.grey.shade200),
+          ),
+          color: Colors.white,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+        ),
       ),
       home: const InterviewListScreen(),
     );
@@ -111,6 +143,35 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     await prefs.setString('saved_interviews', encoded);
   }
 
+  Future<void> _addToCalendar(InterviewItem item) async {
+    final startTime = item.dateTime.millisecondsSinceEpoch;
+    final endTime = item.dateTime.add(const Duration(hours: 1)).millisecondsSinceEpoch;
+    final title = Uri.encodeComponent('ראיון עבודה: ${item.company} - ${item.position}');
+    final desc = Uri.encodeComponent('איש קשר: ${item.contactName} ${item.contactPhone}\n${item.notes}');
+    final loc = Uri.encodeComponent(item.locationOrLink);
+
+    final calendarUri = Uri.parse(
+      'content://com.android.calendar/time/$startTime?action=android.intent.action.INSERT&title=$title&description=$desc&eventLocation=$loc&beginTime=$startTime&endTime=$endTime',
+    );
+
+    if (await canLaunchUrl(calendarUri)) {
+      await launchUrl(calendarUri);
+    } else {
+      final genericUri = Uri.parse(
+        'https://www.google.com/calendar/render?action=TEMPLATE&text=$title&details=$desc&location=$loc&dates=${item.dateTime.toUtc().toIso8601String().replaceAll(RegExp(r'[-:]'), '').split('.').first}Z/${item.dateTime.add(const Duration(hours: 1)).toUtc().toIso8601String().replaceAll(RegExp(r'[-:]'), '').split('.').first}Z',
+      );
+      await launchUrl(genericUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _callPhone(String phone) async {
+    if (phone.isEmpty) return;
+    final uri = Uri.parse('tel:$phone');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
   void _addOrEditInterview([InterviewItem? item]) async {
     final result = await Navigator.push(
       context,
@@ -143,111 +204,201 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'עבר בהצלחה':
-        return Colors.green;
+        return Colors.green.shade600;
       case 'בוטל/נדחה':
-        return Colors.red;
+        return Colors.red.shade600;
       case 'ממתין לתשובה':
-        return Colors.orange;
+        return Colors.amber.shade800;
       default:
-        return Colors.blue;
+        return Colors.indigo.shade600;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'he');
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('מעקב ראיונות עבודה'),
+        title: const Text('מעקב ראיונות עבודה', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.black.withOpacity(0.05),
+        elevation: 2,
       ),
       body: _interviews.isEmpty
-          ? const Center(
-              child: Text(
-                'אין כרגע ראיונות ברשימה.\nלחץ על הפלוס כדי להוסיף ראיון חדש!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.event_note_outlined, size: 70, color: Colors.indigo.shade200),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'אין ראיונות שמורים כרגע',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'לחץ על הכפתור למטה כדי להוסיף ראיון חדש',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
               ),
             )
-          : ListView.builder(
-              padding: const EdgeInsets.all(12),
+          : ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               itemCount: _interviews.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final item = _interviews[index];
-                final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+                final statusColor = _getStatusColor(item.status);
+
                 return Card(
-                  elevation: 2,
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(12),
-                    title: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.company,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(item.status).withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            item.status,
-                            style: TextStyle(
-                              color: _getStatusColor(item.status),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    subtitle: Column(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 6),
-                        Text('תפקיד: ${item.position}', style: const TextStyle(fontSize: 15)),
-                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.indigo.shade50,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(Icons.business_rounded, color: Colors.indigo.shade700, size: 28),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.company,
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    item.position,
+                                    style: TextStyle(fontSize: 15, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                item.status,
+                                style: TextStyle(
+                                  color: statusColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 24),
                         Row(
                           children: [
-                            const Icon(Icons.access_time, size: 16, color: Colors.grey),
-                            const SizedBox(width: 4),
-                            Text(dateFormat.format(item.dateTime), style: const TextStyle(color: Colors.grey)),
+                            Icon(Icons.calendar_today_rounded, size: 16, color: Colors.indigo.shade400),
+                            const SizedBox(width: 6),
+                            Text(
+                              dateFormat.format(item.dateTime),
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                            ),
                           ],
                         ),
                         if (item.contactName.isNotEmpty || item.contactPhone.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text('איש קשר: ${item.contactName} (${item.contactPhone})'),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.person_outline_rounded, size: 16, color: Colors.grey.shade600),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${item.contactName} ${item.contactPhone.isNotEmpty ? '• ${item.contactPhone}' : ''}',
+                                style: TextStyle(color: Colors.grey.shade800, fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (item.locationOrLink.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.place_outlined, size: 16, color: Colors.grey.shade600),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  item.locationOrLink,
+                                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                         if (item.notes.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text('הערות: ${item.notes}', style: const TextStyle(fontStyle: FontStyle.italic)),
+                          const SizedBox(height: 10),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              item.notes,
+                              style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                            ),
+                          ),
                         ],
+                        const SizedBox(height: 12),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () => _addToCalendar(item),
+                              icon: const Icon(Icons.event_available_rounded, size: 18),
+                              label: const Text('ליומן'),
+                            ),
+                            if (item.contactPhone.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.phone_rounded, color: Colors.green),
+                                tooltip: 'התקשר',
+                                onPressed: () => _callPhone(item.contactPhone),
+                              ),
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              tooltip: 'ערוך',
+                              onPressed: () => _addOrEditInterview(item),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              tooltip: 'מחק',
+                              onPressed: () => _deleteInterview(item.id),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                    trailing: PopupMenuButton(
-                      onSelected: (val) {
-                        if (val == 'edit') _addOrEditInterview(item);
-                        if (val == 'delete') _deleteInterview(item.id);
-                      },
-                      itemBuilder: (ctx) => [
-                        const PopupMenuItem(value: 'edit', child: Text('ערוך')),
-                        const PopupMenuItem(value: 'delete', child: Text('מחק')),
-                      ],
-                    ),
-                    onTap: () => _addOrEditInterview(item),
                   ),
                 );
               },
             ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _addOrEditInterview(),
-        icon: const Icon(Icons.add),
-        label: const Text('ראיון חדש'),
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('ראיון חדש', style: TextStyle(fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -300,6 +451,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
       initialDate: _dateTime,
       firstDate: DateTime(2024),
       lastDate: DateTime(2030),
+      locale: const Locale('he', 'IL'),
     );
     if (pickedDate == null) return;
 
@@ -323,100 +475,147 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'he');
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.item == null ? 'הוספת ראיון' : 'עריכת ראיון'),
+        title: Text(widget.item == null ? 'הוספת ראיון חדש' : 'עריכת פרטי ראיון'),
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Form(
           key: _formKey,
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               TextFormField(
                 initialValue: _company,
-                decoration: const InputDecoration(labelText: 'שם החברה *', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'שם החברה *',
+                  prefixIcon: Icon(Icons.business),
+                ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
                 onSaved: (val) => _company = val!.trim(),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 initialValue: _position,
-                decoration: const InputDecoration(labelText: 'תפקיד *', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'תפקיד *',
+                  prefixIcon: Icon(Icons.work_outline),
+                ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
                 onSaved: (val) => _position = val!.trim(),
               ),
-              const SizedBox(height: 12),
-              ListTile(
-                tileColor: Colors.grey.shade100,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                leading: const Icon(Icons.calendar_today),
-                title: Text('מועד הראיון: ${dateFormat.format(_dateTime)}'),
-                trailing: TextButton(
-                  onPressed: _pickDateTime,
-                  child: const Text('שנה מועד'),
+              const SizedBox(height: 14),
+              InkWell(
+                onTap: _pickDateTime,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.pad(BorderSide(color: Colors.grey.shade300)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_month_rounded, color: Colors.indigo),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('מועד הראיון', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                            Text(
+                              dateFormat.format(_dateTime),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.edit_calendar, size: 20, color: Colors.grey),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               DropdownButtonFormField<String>(
                 value: _status,
-                decoration: const InputDecoration(labelText: 'סטטוס', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'סטטוס',
+                  prefixIcon: Icon(Icons.flag_outlined),
+                ),
                 items: _statusOptions
                     .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                     .toList(),
                 onChanged: (val) => setState(() => _status = val!),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 initialValue: _contactName,
-                decoration: const InputDecoration(labelText: 'שם איש קשר / מגייסת', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'איש / אשת קשר',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
                 onSaved: (val) => _contactName = val?.trim() ?? '',
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 initialValue: _contactPhone,
                 keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: 'טלפון איש קשר', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'טלפון איש קשר',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
                 onSaved: (val) => _contactPhone = val?.trim() ?? '',
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 initialValue: _locationOrLink,
-                decoration: const InputDecoration(labelText: 'מיקום / קישור ל-Zoom או Teams', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'מיקום פיזי / קישור לפגישה (Zoom, Teams)',
+                  prefixIcon: Icon(Icons.link_rounded),
+                ),
                 onSaved: (val) => _locationOrLink = val?.trim() ?? '',
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 14),
               TextFormField(
                 initialValue: _notes,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'הערות ודגשים לקראת הראיון', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'דגשים, ציפיות שכר והערות',
+                  alignLabelWithHint: true,
+                  prefixIcon: Icon(Icons.note_alt_outlined),
+                ),
                 onSaved: (val) => _notes = val?.trim() ?? '',
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      _formKey.currentState!.save();
-                      final newItem = InterviewItem(
-                        id: widget.item?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                        company: _company,
-                        position: _position,
-                        dateTime: _dateTime,
-                        status: _status,
-                        contactName: _contactName,
-                        contactPhone: _contactPhone,
-                        locationOrLink: _locationOrLink,
-                        notes: _notes,
-                      );
-                      Navigator.pop(context, newItem);
-                    }
-                  },
-                  child: const Text('שמור ראיון', style: TextStyle(fontSize: 16)),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.indigo,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
+                onPressed: () {
+                  if (_formKey.currentState!.validate()) {
+                    _formKey.currentState!.save();
+                    final newItem = InterviewItem(
+                      id: widget.item?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                      company: _company,
+                      position: _position,
+                      dateTime: _dateTime,
+                      status: _status,
+                      contactName: _contactName,
+                      contactPhone: _contactPhone,
+                      locationOrLink: _locationOrLink,
+                      notes: _notes,
+                    );
+                    Navigator.pop(context, newItem);
+                  }
+                },
+                child: const Text('שמור ראיון', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
