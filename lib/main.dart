@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:intl/intl.dart' show DateFormat;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -21,12 +21,6 @@ class InterviewApp extends StatelessWidget {
         colorSchemeSeed: Colors.indigo,
         scaffoldBackgroundColor: const Color(0xFFF8F9FD),
       ),
-      builder: (context, child) {
-        return Directionality(
-          textDirection: TextDirection.RTL,
-          child: child!,
-        );
-      },
       home: const InterviewListScreen(),
     );
   }
@@ -237,10 +231,9 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
                               padding: const EdgeInsets.all(10),
@@ -469,6 +462,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
             children: [
               TextFormField(
                 initialValue: _company,
+                textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'שם החברה *',
                   border: OutlineInputBorder(),
@@ -480,6 +474,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 initialValue: _position,
+                textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'תפקיד *',
                   border: OutlineInputBorder(),
@@ -536,6 +531,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 initialValue: _contactName,
+                textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'איש / אשת קשר',
                   border: OutlineInputBorder(),
@@ -547,6 +543,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               TextFormField(
                 initialValue: _contactPhone,
                 keyboardType: TextInputType.phone,
+                textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'טלפון איש קשר',
                   border: OutlineInputBorder(),
@@ -557,6 +554,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               const SizedBox(height: 14),
               TextFormField(
                 initialValue: _locationOrLink,
+                textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'מיקום פיזי / קישור לפגישה (Zoom, Teams)',
                   border: OutlineInputBorder(),
@@ -568,6 +566,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               TextFormField(
                 initialValue: _notes,
                 maxLines: 3,
+                textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'דגשים, ציפיות שכר והערות',
                   border: OutlineInputBorder(),
