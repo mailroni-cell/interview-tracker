@@ -1,6 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -31,7 +32,7 @@ class InterviewApp extends StatelessWidget {
 }
 
 // ----------------------------------------------------
-// מסך פתיחה - מוצג למשך 5 שניות מלאות
+// מסך פתיחה - 5 שניות
 // ----------------------------------------------------
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -219,7 +220,7 @@ class InterviewItem {
 }
 
 // ----------------------------------------------------
-// המסך הראשי ודשבורד המדדים
+// המסך הראשי
 // ----------------------------------------------------
 class InterviewListScreen extends StatefulWidget {
   const InterviewListScreen({super.key});
@@ -560,7 +561,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                     const SizedBox(height: 12),
                     const Text('אין ראיונות ברשימה', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    const Text('העתק זימון מהמייל ולחץ על ראיון חדש!', style: TextStyle(color: Colors.grey)),
+                    const Text('לחץ על ראיון חדש וטען את קובץ הזימון מהמייל!', style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
@@ -777,7 +778,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
 }
 
 // ----------------------------------------------------
-// טופס ראיון + כפתור משיכה מהירה מה-Clipboard
+// טופס ומפענח קובצי .ics
 // ----------------------------------------------------
 class InterviewFormScreen extends StatefulWidget {
   final InterviewItem? item;
@@ -835,121 +836,131 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
     super.dispose();
   }
 
-  Future<void> _fetchAndParseFromClipboard() async {
-    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = clipboardData?.text ?? '';
+  Future<void> _pickAndParseIcsFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+      );
 
-    if (text.trim().isEmpty) {
+      if (result == null || result.files.single.path == null) return;
+
+      final file = File(result.files.single.path!);
+      final content = await file.readAsString();
+      _parseIcsContent(content);
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('לא נמצא טקסט מועתק. העתק את הזימון מהמייל תחילה!')),
+        const SnackBar(content: Text('שגיאה בקריאת הקובץ. ודא שנבחר קובץ זימון תקין (.ics)')),
       );
-      return;
     }
-
-    _parseEmailText(text);
   }
 
-  void _parseEmailText(String rawText) {
-    final lower = rawText.toLowerCase();
+  void _parseIcsContent(String ics) {
+    String summary = '';
+    String location = '';
+    String description = '';
+    String dtStart = '';
 
-    // 1. זיהוי פלטפורמה
-    if (lower.contains('teams.microsoft.com') || lower.contains('טימס') || lower.contains('teams')) {
-      _platform = 'טימס';
-    } else if (lower.contains('zoom.us') || lower.contains('זום') || lower.contains('zoom')) {
-      _platform = 'זום';
-    } else if (lower.contains('meet.google.com') || lower.contains('מיט') || lower.contains('meet')) {
-      _platform = 'Google Meet';
-    } else if (lower.contains('במשרד') || lower.contains('קומה') || lower.contains('רחוב') || lower.contains('כתובת')) {
-      _platform = 'פרונטלי';
-    }
-
-    // 2. קישור לפגישה
-    final urlRegex = RegExp(r'(https?:\/\/[^\s<>"\)]+)');
-    final urlMatches = urlRegex.allMatches(rawText);
-    for (final match in urlMatches) {
-      final url = match.group(0)!;
-      if (url.contains('teams') || url.contains('zoom') || url.contains('meet') || _locationController.text.isEmpty) {
-        _locationController.text = url;
-        if (url.contains('teams') || url.contains('zoom') || url.contains('meet')) break;
-      }
-    }
-
-    // 3. טלפון ישראלי
-    final phoneRegex = RegExp(r'(05\d[-\s]?\d{3}[-\s]?\d{4}|\+?972[-\s]?5\d[-\s]?\d{3}[-\s]?\d{4}|0[23489][-\s]?\d{7})');
-    final phoneMatch = phoneRegex.firstMatch(rawText);
-    if (phoneMatch != null) {
-      _contactPhoneController.text = phoneMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
-    }
-
-    // 4. שעה ותאריך
-    final timeRegex = RegExp(r'\b([01]?\d|2[0-3])[:.]([0-5]\d)\b');
-    final timeMatch = timeRegex.firstMatch(rawText);
-
-    final dateRegex = RegExp(r'\b(0?[1-9]|[12]\d|3[01])[\/\.\-](0?[1-9]|1[012])([\/\.\-](\d{2,4}))?\b');
-    final dateMatch = dateRegex.firstMatch(rawText);
-
-    int hour = _dateTime.hour;
-    int minute = _dateTime.minute;
-    if (timeMatch != null) {
-      hour = int.tryParse(timeMatch.group(1)!) ?? hour;
-      minute = int.tryParse(timeMatch.group(2)!) ?? minute;
-    }
-
-    int year = _dateTime.year;
-    int month = _dateTime.month;
-    int day = _dateTime.day;
-    if (dateMatch != null) {
-      day = int.tryParse(dateMatch.group(1)!) ?? day;
-      month = int.tryParse(dateMatch.group(2)!) ?? month;
-      if (dateMatch.group(4) != null) {
-        int y = int.tryParse(dateMatch.group(4)!) ?? year;
-        year = y < 100 ? 2000 + y : y;
-      }
-    }
-
-    try {
-      _dateTime = DateTime(year, month, day, hour, minute);
-    } catch (_) {}
-
-    // 5. חילוץ חברה ותפקיד
-    final lines = rawText
-        .split('\n')
-        .map((l) => l.trim())
-        .where((l) => l.isNotEmpty && !l.startsWith('http'))
-        .toList();
+    // פיענוח שורות מקופלות ב-ICS (Unfolding)
+    final unfolded = ics.replaceAll(RegExp(r'\r?\n[ \t]'), '');
+    final lines = unfolded.split(RegExp(r'\r?\n'));
 
     for (var line in lines) {
-      if (RegExp(r'(תפקיד|משרה|לתפקיד|למשרת|position|role)[:\s\-]', caseSensitive: false).hasMatch(line)) {
-        final clean = line.replaceAll(RegExp(r'^(תפקיד|משרה|לתפקיד|למשרת|position|role)[:\s\-]+', caseSensitive: false), '').trim();
-        if (clean.isNotEmpty && clean.length < 50) _positionController.text = clean;
-      }
-      if (RegExp(r'(חברה|חברת|ראיון ב|ראיון בחברת|company|interview with)[:\s\-]', caseSensitive: false).hasMatch(line)) {
-        final clean = line.replaceAll(RegExp(r'^(חברה|חברת|ראיון ב|ראיון בחברת|company|interview with)[:\s\-]+', caseSensitive: false), '').trim();
-        if (clean.isNotEmpty && clean.length < 40) _companyController.text = clean;
-      }
-      if (RegExp(r'(מראיין|מראיינת|איש קשר|hr|recruiter)[:\s\-]', caseSensitive: false).hasMatch(line)) {
-        final clean = line.replaceAll(RegExp(r'^(מראיין|מראיינת|איש קשר|hr|recruiter)[:\s\-]+', caseSensitive: false), '').trim();
-        if (clean.isNotEmpty && clean.length < 30) _contactNameController.text = clean;
-      }
-    }
-
-    if (_companyController.text.isEmpty && lines.isNotEmpty) {
-      for (var l in lines) {
-        if (!l.contains('שלום') && !l.contains('היי') && !l.contains(':') && l.length < 30) {
-          _companyController.text = l;
-          break;
+      if (line.startsWith('SUMMARY:')) {
+        summary = line.substring(8).trim();
+      } else if (line.startsWith('LOCATION:')) {
+        location = line.substring(9).trim().replaceAll(r'\,', ',');
+      } else if (line.startsWith('DESCRIPTION:')) {
+        description = line.substring(12).trim().replaceAll(r'\n', '\n').replaceAll(r'\,', ',');
+      } else if (line.startsWith('DTSTART')) {
+        final parts = line.split(':');
+        if (parts.length > 1) {
+          dtStart = parts.last.trim();
         }
       }
     }
 
-    if (_notesController.text.isEmpty) {
-      _notesController.text = rawText.trim();
+    // 1. פענוח תאריך ושעה מובנים (למשל 20261015T140000Z)
+    if (dtStart.isNotEmpty) {
+      try {
+        final cleanDt = dtStart.replaceAll(RegExp(r'[^0-9T]'), '');
+        if (cleanDt.contains('T')) {
+          final p = cleanDt.split('T');
+          final d = p[0];
+          final t = p[1];
+          if (d.length >= 8 && t.length >= 4) {
+            final y = int.parse(d.substring(0, 4));
+            final m = int.parse(d.substring(4, 6));
+            final day = int.parse(d.substring(6, 8));
+            final h = int.parse(t.substring(0, 2));
+            final min = int.parse(t.substring(2, 4));
+            
+            // המרה משעת UTC לשעה מקומית במידה ויש סיומת Z
+            if (dtStart.endsWith('Z')) {
+              _dateTime = DateTime.utc(y, m, day, h, min).toLocal();
+            } else {
+              _dateTime = DateTime(y, m, day, h, min);
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. פיענוח כותרת (Summary) לחברה ולתפקיד
+    if (summary.isNotEmpty) {
+      // חלוקה לפי תווים מקובלים כמו - , : או |
+      final splitParts = summary.split(RegExp(r'[-:|]'));
+      if (splitParts.length >= 2) {
+        _companyController.text = splitParts[0].trim();
+        _positionController.text = splitParts.sublist(1).join(' - ').trim();
+      } else {
+        _positionController.text = summary;
+      }
+    }
+
+    // 3. פיענוח מיקום / קישור ופלטפורמה
+    final fullTextToScan = '$location\n$description';
+    final urlRegex = RegExp(r'(https?:\/\/[^\s<>"\)]+)');
+    final allUrls = urlRegex.allMatches(fullTextToScan).map((m) => m.group(0)!).toList();
+
+    String meetingUrl = '';
+    for (var u in allUrls) {
+      final lu = u.toLowerCase();
+      if (lu.contains('teams.microsoft.com') || lu.contains('meet.google.com') || lu.contains('zoom.us')) {
+        meetingUrl = u;
+        break;
+      }
+    }
+    if (meetingUrl.isEmpty && allUrls.isNotEmpty) {
+      meetingUrl = allUrls.first;
+    }
+
+    if (meetingUrl.isNotEmpty) {
+      _locationController.text = meetingUrl;
+      final lu = meetingUrl.toLowerCase();
+      if (lu.contains('teams')) _platform = 'טימס';
+      else if (lu.contains('zoom')) _platform = 'זום';
+      else if (lu.contains('meet.google')) _platform = 'Google Meet';
+    } else if (location.isNotEmpty) {
+      _locationController.text = location;
+      _platform = 'פרונטלי';
+    }
+
+    // 4. איתור טלפון
+    final phoneRegex = RegExp(r'\b(05\d[-\s]?\d{3}[-\s]?\d{4}|\+?972[-\s]?5\d[-\s]?\d{3}[-\s]?\d{4})\b');
+    final phoneMatch = phoneRegex.firstMatch(fullTextToScan);
+    if (phoneMatch != null) {
+      _contactPhoneController.text = phoneMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
+    }
+
+    // 5. הערות
+    if (description.isNotEmpty) {
+      _notesController.text = description;
     }
 
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('הפרטים נשאבו מהמייל! פלטפורמה: $_platform')),
+      SnackBar(content: Text('קובץ הזימון נטען בהצלחה! פלטפורמה: $_platform')),
     );
   }
 
@@ -1002,11 +1013,11 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                onPressed: _fetchAndParseFromClipboard,
-                icon: const Icon(Icons.flash_on_rounded, color: Colors.amberAccent),
+                onPressed: _pickAndParseIcsFile,
+                icon: const Icon(Icons.file_present_rounded, color: Colors.amberAccent),
                 label: const Text(
-                  'שאב נתונים אוטומטית ממה שהעתקת מהמייל',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  'טען קובץ זימון מהמייל (.ics)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
               ),
               const SizedBox(height: 16),
@@ -1162,10 +1173,10 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _notesController,
-                maxLines: 3,
+                maxLines: 4,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
-                  labelText: 'דגשים והערות',
+                  labelText: 'דגשים, תוכן המייל המלא והערות',
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.note_alt_outlined),
                 ),
