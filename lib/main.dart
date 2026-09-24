@@ -19,7 +19,7 @@ class InterviewApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: Colors.indigo,
-        scaffoldBackgroundColor: const Color(0xFFF4F6FA),
+        scaffoldBackgroundColor: const Color(0xFFF1F5F9),
       ),
       home: const Directionality(
         textDirection: TextDirection.rtl,
@@ -35,10 +35,14 @@ class InterviewItem {
   String position;
   DateTime dateTime;
   String status;
+  String platform;
   String contactName;
   String contactPhone;
   String locationOrLink;
   String notes;
+  bool isOnline;
+  bool hasHomeAssignment;
+  bool salaryCoordinated;
 
   InterviewItem({
     required this.id,
@@ -46,10 +50,14 @@ class InterviewItem {
     required this.position,
     required this.dateTime,
     this.status = 'נקבע',
+    this.platform = 'זום',
     this.contactName = '',
     this.contactPhone = '',
     this.locationOrLink = '',
     this.notes = '',
+    this.isOnline = true,
+    this.hasHomeAssignment = false,
+    this.salaryCoordinated = false,
   });
 
   Map<String, dynamic> toMap() {
@@ -59,10 +67,14 @@ class InterviewItem {
       'position': position,
       'dateTime': dateTime.toIso8601String(),
       'status': status,
+      'platform': platform,
       'contactName': contactName,
       'contactPhone': contactPhone,
       'locationOrLink': locationOrLink,
       'notes': notes,
+      'isOnline': isOnline,
+      'hasHomeAssignment': hasHomeAssignment,
+      'salaryCoordinated': salaryCoordinated,
     };
   }
 
@@ -73,10 +85,14 @@ class InterviewItem {
       position: map['position'],
       dateTime: DateTime.parse(map['dateTime']),
       status: map['status'] ?? 'נקבע',
+      platform: map['platform'] ?? (map['isOnline'] == false ? 'פרונטלי' : 'זום'),
       contactName: map['contactName'] ?? '',
       contactPhone: map['contactPhone'] ?? '',
       locationOrLink: map['locationOrLink'] ?? '',
       notes: map['notes'] ?? '',
+      isOnline: map['isOnline'] ?? true,
+      hasHomeAssignment: map['hasHomeAssignment'] ?? false,
+      salaryCoordinated: map['salaryCoordinated'] ?? false,
     );
   }
 }
@@ -118,8 +134,10 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
   Future<void> _addToCalendar(InterviewItem item) async {
     final startTime = item.dateTime.millisecondsSinceEpoch;
     final endTime = item.dateTime.add(const Duration(hours: 1)).millisecondsSinceEpoch;
-    final title = Uri.encodeComponent('ראיון: ${item.company} - ${item.position}');
-    final desc = Uri.encodeComponent('איש קשר: ${item.contactName} ${item.contactPhone}\n${item.notes}');
+    final title = Uri.encodeComponent('ראיון (${item.platform}): ${item.company} - ${item.position}');
+    final desc = Uri.encodeComponent(
+      'פלטפורמה: ${item.platform}\nאיש קשר: ${item.contactName} ${item.contactPhone}\nקישור/מיקום: ${item.locationOrLink}\nהערות: ${item.notes}',
+    );
     final loc = Uri.encodeComponent(item.locationOrLink);
 
     final calendarUri = Uri.parse(
@@ -136,9 +154,22 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     }
   }
 
+  Future<void> _openMeetingLink(String link) async {
+    if (link.isEmpty) return;
+    String cleanUrl = link.trim();
+    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+      cleanUrl = 'https://$cleanUrl';
+    }
+    final uri = Uri.parse(cleanUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Future<void> _callPhone(String phone) async {
     if (phone.isEmpty) return;
-    final uri = Uri.parse('tel:$phone');
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }
@@ -191,34 +222,42 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     }
   }
 
-  Widget _buildDashboard() {
-    final total = _interviews.length;
-    final success = _interviews.where((i) => i.status == 'עבר בהצלחה').length;
-    final pending = _interviews.where((i) => i.status == 'ממתין לתשובה' || i.status == 'נקבע').length;
-    final rejected = _interviews.where((i) => i.status == 'בוטל/נדחה').length;
-
-    final successRate = total > 0 ? ((success / total) * 100).toStringAsFixed(0) : '0';
-
-    InterviewItem? nextInterview;
-    final now = DateTime.now();
-    for (var item in _interviews) {
-      if (item.dateTime.isAfter(now)) {
-        nextInterview = item;
-        break;
-      }
+  Color _getPlatformColor(String platform) {
+    switch (platform) {
+      case 'זום':
+        return Colors.blue.shade700;
+      case 'טימס':
+        return Colors.deepPurple.shade600;
+      case 'Google Meet':
+        return Colors.teal.shade700;
+      default:
+        return Colors.brown.shade700;
     }
+  }
+
+  Widget _buildWelcomeHero() {
+    final now = DateTime.now();
+    final todayCount = _interviews.where((i) {
+      return i.dateTime.year == now.year &&
+          i.dateTime.month == now.month &&
+          i.dateTime.day == now.day;
+    }).length;
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF312E81), Color(0xFF4F46E5)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.indigo.withOpacity(0.25),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -228,116 +267,132 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'לוח בקרה ומדדים',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'מעקב ראיונות עבודה',
+                    style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    DateFormat('EEEE, d MMMM', 'he').format(now),
+                    style: TextStyle(color: Colors.indigo.shade100, fontSize: 13),
+                  ),
+                ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.shade50,
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withOpacity(0.15),
+                  shape: BoxShape.circle,
                 ),
-                child: Text(
-                  'הצלחה: $successRate%',
-                  style: TextStyle(color: Colors.indigo.shade700, fontWeight: FontWeight.bold, fontSize: 13),
-                ),
+                child: const Icon(Icons.rocket_launch_rounded, color: Colors.white, size: 24),
               ),
             ],
           ),
           const SizedBox(height: 16),
-          Row(
-            children: [
-              _buildStatCard('סך הכול', total.toString(), Icons.folder_open_rounded, Colors.blue),
-              const SizedBox(width: 8),
-              _buildStatCard('בתהליך', pending.toString(), Icons.hourglass_top_rounded, Colors.orange),
-              const SizedBox(width: 8),
-              _buildStatCard('הצלחה', success.toString(), Icons.check_circle_outline_rounded, Colors.green),
-              const SizedBox(width: 8),
-              _buildStatCard('נדחה', rejected.toString(), Icons.cancel_outlined, Colors.red),
-            ],
-          ),
-          if (total > 0) ...[
-            const SizedBox(height: 16),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                height: 8,
-                child: Row(
-                  children: [
-                    if (success > 0)
-                      Expanded(flex: success, child: Container(color: const Color(0xFF10B981))),
-                    if (pending > 0)
-                      Expanded(flex: pending, child: Container(color: const Color(0xFFF59E0B))),
-                    if (rejected > 0)
-                      Expanded(flex: rejected, child: Container(color: const Color(0xFFEF4444))),
-                    if (total - (success + pending + rejected) > 0)
-                      Expanded(
-                        flex: total - (success + pending + rejected),
-                        child: Container(color: const Color(0xFF6366F1)),
-                      ),
-                  ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  todayCount > 0 ? Icons.notification_important_rounded : Icons.check_circle_outline_rounded,
+                  color: Colors.amberAccent,
+                  size: 18,
                 ),
-              ),
+                const SizedBox(width: 8),
+                Text(
+                  todayCount > 0 ? 'יש לך $todayCount ראיונות מתוכננים להיום!' : 'אין ראיונות מתוכננים להיום',
+                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
-          ],
-          if (nextInterview != null) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.indigo.shade100),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.alarm_on_rounded, color: Colors.indigo.shade600, size: 24),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'הראיון הבא: ${nextInterview.company}',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        Text(
-                          DateFormat('dd/MM/yyyy • HH:mm').format(nextInterview.dateTime),
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String title, String count, IconData icon, MaterialColor color) {
+  Widget _buildDashboard() {
+    final total = _interviews.length;
+    final success = _interviews.where((i) => i.status == 'עבר בהצלחה').length;
+    final pending = _interviews.where((i) => i.status == 'ממתין לתשובה' || i.status == 'נקבע').length;
+    final rejected = _interviews.where((i) => i.status == 'בוטל/נדחה').length;
+    final successRate = total > 0 ? ((success / total) * 100).toStringAsFixed(0) : '0';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'מדדי גיוס והתקדמות',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$successRate% מעבר',
+                  style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _buildStat('סך הכל', total.toString(), Icons.folder_shared_outlined, Colors.indigo),
+              const SizedBox(width: 8),
+              _buildStat('בתהליך', pending.toString(), Icons.hourglass_empty_rounded, Colors.orange),
+              const SizedBox(width: 8),
+              _buildStat('הצלחה', success.toString(), Icons.verified_outlined, Colors.green),
+              const SizedBox(width: 8),
+              _buildStat('נדחה', rejected.toString(), Icons.cancel_outlined, Colors.red),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStat(String label, String value, IconData icon, MaterialColor color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: color.shade50,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Column(
           children: [
-            Icon(icon, color: color.shade700, size: 20),
-            const SizedBox(height: 4),
-            Text(
-              count,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color.shade900),
-            ),
-            Text(
-              title,
-              style: TextStyle(fontSize: 11, color: color.shade700, fontWeight: FontWeight.w600),
-            ),
+            Icon(icon, color: color.shade700, size: 18),
+            const SizedBox(height: 2),
+            Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color.shade900)),
+            Text(label, style: TextStyle(fontSize: 10, color: color.shade700, fontWeight: FontWeight.w600)),
           ],
         ),
       ),
@@ -350,16 +405,15 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('מעקב ראיונות עבודה', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('Job Tracker Pro', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0.5,
       ),
       body: CustomScrollView(
         slivers: [
-          SliverToBoxAdapter(
-            child: _buildDashboard(),
-          ),
+          SliverToBoxAdapter(child: _buildWelcomeHero()),
+          SliverToBoxAdapter(child: _buildDashboard()),
           if (_interviews.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
@@ -367,26 +421,24 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.event_note_outlined, size: 64, color: Colors.indigo.shade200),
+                    Icon(Icons.mark_email_read_outlined, size: 60, color: Colors.indigo.shade200),
                     const SizedBox(height: 12),
-                    const Text(
-                      'אין ראיונות שמורים כרגע',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                    ),
+                    const Text('אין ראיונות ברשימה', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    const Text('הוסף ראיון כדי להפעיל את לוח המדדים', style: TextStyle(color: Colors.grey)),
+                    const Text('לחץ למטה והדבק זימון ישירות מהמייל!', style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
             )
           else
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final item = _interviews[index];
                     final statusColor = _getStatusColor(item.status);
+                    final platformColor = _getPlatformColor(item.platform);
 
                     return Card(
                       elevation: 0,
@@ -409,9 +461,9 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                                     color: Colors.indigo.shade50,
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: Icon(Icons.business_rounded, color: Colors.indigo.shade700, size: 26),
+                                  child: Icon(Icons.business_rounded, color: Colors.indigo.shade700, size: 24),
                                 ),
-                                const SizedBox(width: 12),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -435,23 +487,39 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                                   ),
                                   child: Text(
                                     item.status,
-                                    style: TextStyle(
-                                      color: statusColor,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                    ),
+                                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
                                   ),
                                 ),
                               ],
                             ),
-                            const Divider(height: 22),
+                            const Divider(height: 20),
                             Row(
                               children: [
-                                Icon(Icons.calendar_today_rounded, size: 15, color: Colors.indigo.shade400),
+                                Icon(Icons.access_time_rounded, size: 15, color: Colors.indigo.shade400),
                                 const SizedBox(width: 6),
-                                Text(
-                                  dateFormat.format(item.dateTime),
-                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                Text(dateFormat.format(item.dateTime), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: platformColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        item.platform == 'פרונטלי' ? Icons.location_on_outlined : Icons.videocam_rounded,
+                                        size: 13,
+                                        color: platformColor,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        item.platform,
+                                        style: TextStyle(fontSize: 11, color: platformColor, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -472,37 +540,49 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                               const SizedBox(height: 6),
                               Row(
                                 children: [
-                                  Icon(Icons.place_outlined, size: 15, color: Colors.grey.shade600),
+                                  Icon(Icons.link_rounded, size: 15, color: Colors.indigo.shade400),
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       item.locationOrLink,
-                                      style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
+                                      style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
                               ),
                             ],
-                            if (item.notes.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  item.notes,
-                                  style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 6,
+                              children: [
+                                if (item.hasHomeAssignment)
+                                  Chip(
+                                    label: const Text('מבחן בית: הוגש', style: TextStyle(fontSize: 11)),
+                                    backgroundColor: Colors.amber.shade50,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                if (item.salaryCoordinated)
+                                  Chip(
+                                    label: const Text('תיאום שכר: סוכם', style: TextStyle(fontSize: 11)),
+                                    backgroundColor: Colors.teal.shade50,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.end,
                               children: [
+                                if (item.locationOrLink.contains('http'))
+                                  TextButton.icon(
+                                    onPressed: () => _openMeetingLink(item.locationOrLink),
+                                    icon: const Icon(Icons.video_call_rounded, size: 18, color: Colors.indigo),
+                                    label: Text(
+                                      'כנס ל-${item.platform}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
+                                    ),
+                                  ),
                                 TextButton.icon(
                                   onPressed: () => _addToCalendar(item),
                                   icon: const Icon(Icons.event_available_rounded, size: 18),
@@ -511,17 +591,14 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                                 if (item.contactPhone.isNotEmpty)
                                   IconButton(
                                     icon: const Icon(Icons.phone_rounded, color: Colors.green),
-                                    tooltip: 'התקשר',
                                     onPressed: () => _callPhone(item.contactPhone),
                                   ),
                                 IconButton(
                                   icon: const Icon(Icons.edit_outlined),
-                                  tooltip: 'ערוך',
                                   onPressed: () => _addOrEditInterview(item),
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline, color: Colors.red),
-                                  tooltip: 'מחק',
                                   onPressed: () => _deleteInterview(item.id),
                                 ),
                               ],
@@ -535,6 +612,17 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                 ),
               ),
             ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 20, bottom: 90),
+              child: Center(
+                child: Text(
+                  'פותח ע"י רוני שניידר • גרסה 1.2',
+                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -558,35 +646,128 @@ class InterviewFormScreen extends StatefulWidget {
 
 class _InterviewFormScreenState extends State<InterviewFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  late String _company;
-  late String _position;
+
+  late TextEditingController _companyController;
+  late TextEditingController _positionController;
+  late TextEditingController _contactNameController;
+  late TextEditingController _contactPhoneController;
+  late TextEditingController _locationController;
+  late TextEditingController _notesController;
+
   late DateTime _dateTime;
   late String _status;
-  late String _contactName;
-  late String _contactPhone;
-  late String _locationOrLink;
-  late String _notes;
+  late String _platform;
+  late bool _hasHomeAssignment;
+  late bool _salaryCoordinated;
 
-  final List<String> _statusOptions = [
-    'נקבע',
-    'התקיים',
-    'ממתין לתשובה',
-    'עבר בהצלחה',
-    'בוטל/נדחה',
-  ];
+  final List<String> _statusOptions = ['נקבע', 'התקיים', 'ממתין לתשובה', 'עבר בהצלחה', 'בוטל/נדחה'];
+  final List<String> _platformOptions = ['זום', 'טימס', 'Google Meet', 'פרונטלי'];
 
   @override
   void initState() {
     super.initState();
     final item = widget.item;
-    _company = item?.company ?? '';
-    _position = item?.position ?? '';
+    _companyController = TextEditingController(text: item?.company ?? '');
+    _positionController = TextEditingController(text: item?.position ?? '');
+    _contactNameController = TextEditingController(text: item?.contactName ?? '');
+    _contactPhoneController = TextEditingController(text: item?.contactPhone ?? '');
+    _locationController = TextEditingController(text: item?.locationOrLink ?? '');
+    _notesController = TextEditingController(text: item?.notes ?? '');
+
     _dateTime = item?.dateTime ?? DateTime.now().add(const Duration(days: 1));
     _status = item?.status ?? 'נקבע';
-    _contactName = item?.contactName ?? '';
-    _contactPhone = item?.contactPhone ?? '';
-    _locationOrLink = item?.locationOrLink ?? '';
-    _notes = item?.notes ?? '';
+    _platform = item?.platform ?? 'זום';
+    _hasHomeAssignment = item?.hasHomeAssignment ?? false;
+    _salaryCoordinated = item?.salaryCoordinated ?? false;
+  }
+
+  @override
+  void dispose() {
+    _companyController.dispose();
+    _positionController.dispose();
+    _contactNameController.dispose();
+    _contactPhoneController.dispose();
+    _locationController.dispose();
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  void _showPasteDialog() {
+    final textController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('הדבק תוכן זימון ממייל/וואטסאפ'),
+        content: TextField(
+          controller: textController,
+          maxLines: 8,
+          textAlign: TextAlign.right,
+          decoration: const InputDecoration(
+            hintText: 'הדבק כאן את כל ההודעה כפי שנשלחה אליך...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ביטול')),
+          FilledButton(
+            onPressed: () {
+              _parseEmailText(textController.text);
+              Navigator.pop(ctx);
+            },
+            child: const Text('חלץ פרטים אוטומטית'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _parseEmailText(String rawText) {
+    if (rawText.trim().isEmpty) return;
+
+    final lower = rawText.toLowerCase();
+
+    if (lower.contains('teams.microsoft.com') || lower.contains('טימס') || lower.contains('teams')) {
+      _platform = 'טימס';
+    } else if (lower.contains('zoom.us') || lower.contains('זום') || lower.contains('zoom')) {
+      _platform = 'זום';
+    } else if (lower.contains('meet.google.com') || lower.contains('מיט') || lower.contains('meet')) {
+      _platform = 'Google Meet';
+    } else if (lower.contains('במשרד') || lower.contains('קומה') || lower.contains('רחוב') || lower.contains('משרדי')) {
+      _platform = 'פרונטלי';
+    }
+
+    final urlRegex = RegExp(r'(https?:\/\/[^\s]+)');
+    final urlMatch = urlRegex.firstMatch(rawText);
+    if (urlMatch != null) {
+      _locationController.text = urlMatch.group(0)!;
+    }
+
+    final phoneRegex = RegExp(r'(\+?972[-\s]?|0)(5[0-9])[-\s]?([0-9]{3})[-\s]?([0-9]{4})');
+    final phoneMatch = phoneRegex.firstMatch(rawText);
+    if (phoneMatch != null) {
+      _contactPhoneController.text = phoneMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
+    }
+
+    final lines = rawText.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+    for (var line in lines) {
+      if (line.contains('חברת') || line.contains('ב-') || line.contains('חברה:')) {
+        final comp = line.replaceAll(RegExp(r'^(חברת|חברה:|ראיון ב-)\s*'), '');
+        if (comp.length < 30) _companyController.text = comp;
+      }
+      if (line.contains('תפקיד:') || line.contains('משרת') || line.contains('למשרת')) {
+        final pos = line.replaceAll(RegExp(r'^(תפקיד:|משרת|למשרת)\s*'), '');
+        if (pos.length < 35) _positionController.text = pos;
+      }
+    }
+
+    if (_companyController.text.isEmpty && lines.isNotEmpty) {
+      _companyController.text = lines.first.length > 25 ? lines.first.substring(0, 25) : lines.first;
+    }
+
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('חולצו פרטים בהצלחה! סוג הפגישה הוגדר כ-$_platform')),
+    );
   }
 
   Future<void> _pickDateTime() async {
@@ -622,47 +803,55 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.item == null ? 'הוספת ראיון חדש' : 'עריכת פרטי ראיון'),
+        title: Text(widget.item == null ? 'הוספת ראיון מהירה' : 'עריכת ראיון'),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(18),
         child: Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  foregroundColor: Colors.indigo,
+                  side: const BorderSide(color: Colors.indigo, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: _showPasteDialog,
+                icon: const Icon(Icons.auto_fix_high_rounded),
+                label: const Text('הדבק זימון ממייל / וואטסאפ (חילוץ אוטומטי)', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 16),
               TextFormField(
-                initialValue: _company,
+                controller: _companyController,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'שם החברה *',
-                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.business),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
-                onSaved: (val) => _company = val!.trim(),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               TextFormField(
-                initialValue: _position,
+                controller: _positionController,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'תפקיד *',
-                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.work_outline),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
-                onSaved: (val) => _position = val!.trim(),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               InkWell(
                 onTap: _pickDateTime,
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     border: Border.all(color: Colors.grey.shade400),
@@ -671,16 +860,13 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                   child: Row(
                     children: [
                       const Icon(Icons.calendar_month_rounded, color: Colors.indigo),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('מועד הראיון', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                            Text(
-                              dateFormat.format(_dateTime),
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-                            ),
+                            const Text('מועד הראיון', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                            Text(dateFormat.format(_dateTime), style: const TextStyle(fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -689,77 +875,117 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              const Text('סוג הפגישה / פלטפורמה:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: _platformOptions.map((plat) {
+                  final isSelected = _platform == plat;
+                  return ChoiceChip(
+                    avatar: Icon(
+                      plat == 'פרונטלי' ? Icons.location_on : Icons.videocam,
+                      size: 16,
+                      color: isSelected ? Colors.white : Colors.indigo,
+                    ),
+                    label: Text(plat),
+                    selected: isSelected,
+                    selectedColor: Colors.indigo,
+                    labelStyle: TextStyle(
+                      color: isSelected ? Colors.white : Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    onSelected: (val) {
+                      if (val) setState(() => _platform = plat);
+                    },
+                  );
+                }).toList(),
+              ),
               const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                value: _status,
-                isExpanded: true,
-                alignment: AlignmentDirectional.centerStart,
-                decoration: const InputDecoration(
-                  labelText: 'סטטוס',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.flag_outlined),
+              const Text('סטטוס הראיון:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: _statusOptions.map((st) {
+                  final isSelected = _status == st;
+                  return ChoiceChip(
+                    label: Text(st),
+                    selected: isSelected,
+                    onSelected: (val) {
+                      if (val) setState(() => _status = st);
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.shade50.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.indigo.shade100),
                 ),
-                items: _statusOptions
-                    .map((s) => DropdownMenuItem(
-                          value: s,
-                          alignment: AlignmentDirectional.centerStart,
-                          child: Text(s, textAlign: TextAlign.right),
-                        ))
-                    .toList(),
-                onChanged: (val) => setState(() => _status = val!),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      dense: true,
+                      title: const Text('נמסר מבחן בית / משימה מקצועית?'),
+                      value: _hasHomeAssignment,
+                      onChanged: (val) => setState(() => _hasHomeAssignment = val),
+                    ),
+                    const Divider(height: 1),
+                    SwitchListTile(
+                      dense: true,
+                      title: const Text('סוכמו ציפיות שכר?'),
+                      value: _salaryCoordinated,
+                      onChanged: (val) => setState(() => _salaryCoordinated = val),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 14),
               TextFormField(
-                initialValue: _contactName,
+                controller: _contactNameController,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'איש / אשת קשר',
-                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.person_outline),
                 ),
-                onSaved: (val) => _contactName = val?.trim() ?? '',
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               TextFormField(
-                initialValue: _contactPhone,
+                controller: _contactPhoneController,
                 keyboardType: TextInputType.phone,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'טלפון איש קשר',
-                  alignLabelWithHint: true,
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.phone_outlined),
                 ),
-                onSaved: (val) => _contactPhone = val?.trim() ?? '',
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               TextFormField(
-                initialValue: _locationOrLink,
+                controller: _locationController,
                 textAlign: TextAlign.right,
-                decoration: const InputDecoration(
-                  labelText: 'מיקום פיזי / קישור לפגישה (Zoom, Teams)',
-                  alignLabelWithHint: true,
-                  border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.link_rounded),
+                decoration: InputDecoration(
+                  labelText: _platform == 'פרונטלי' ? 'כתובת הגעה / משרד' : 'קישור לפגישה (Zoom / Teams / Meet)',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: Icon(_platform == 'פרונטלי' ? Icons.place_outlined : Icons.link_rounded),
                 ),
-                onSaved: (val) => _locationOrLink = val?.trim() ?? '',
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               TextFormField(
-                initialValue: _notes,
-                maxLines: 3,
+                controller: _notesController,
+                maxLines: 2,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
-                  labelText: 'דגשים, ציפיות שכר והערות',
+                  labelText: 'דגשים והערות',
                   border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
                   suffixIcon: Icon(Icons.note_alt_outlined),
                 ),
-                onSaved: (val) => _notes = val?.trim() ?? '',
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 22),
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.indigo,
@@ -768,17 +994,20 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 ),
                 onPressed: () {
                   if (_formKey.currentState!.validate()) {
-                    _formKey.currentState!.save();
                     final newItem = InterviewItem(
                       id: widget.item?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                      company: _company,
-                      position: _position,
+                      company: _companyController.text.trim(),
+                      position: _positionController.text.trim(),
                       dateTime: _dateTime,
                       status: _status,
-                      contactName: _contactName,
-                      contactPhone: _contactPhone,
-                      locationOrLink: _locationOrLink,
-                      notes: _notes,
+                      platform: _platform,
+                      contactName: _contactNameController.text.trim(),
+                      contactPhone: _contactPhoneController.text.trim(),
+                      locationOrLink: _locationController.text.trim(),
+                      notes: _notesController.text.trim(),
+                      isOnline: _platform != 'פרונטלי',
+                      hasHomeAssignment: _hasHomeAssignment,
+                      salaryCoordinated: _salaryCoordinated,
                     );
                     Navigator.pop(context, newItem);
                   }
