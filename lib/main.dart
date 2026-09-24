@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -220,7 +220,7 @@ class InterviewItem {
 }
 
 // ----------------------------------------------------
-// המסך הראשי
+// המסך הראשי + האזנה לקובצי ICS + כפתור הוראות
 // ----------------------------------------------------
 class InterviewListScreen extends StatefulWidget {
   const InterviewListScreen({super.key});
@@ -231,11 +231,60 @@ class InterviewListScreen extends StatefulWidget {
 
 class _InterviewListScreenState extends State<InterviewListScreen> {
   List<InterviewItem> _interviews = [];
+  late AppLinks _appLinks;
 
   @override
   void initState() {
     super.initState();
     _loadInterviews();
+    _initIncomingFileListener();
+  }
+
+  void _initIncomingFileListener() {
+    _appLinks = AppLinks();
+    _appLinks.uriLinkStream.listen((Uri? uri) {
+      if (uri != null) {
+        _handleIncomingUri(uri);
+      }
+    });
+
+    _appLinks.getInitialLink().then((Uri? uri) {
+      if (uri != null) {
+        _handleIncomingUri(uri);
+      }
+    });
+  }
+
+  Future<void> _handleIncomingUri(Uri uri) async {
+    try {
+      String content = '';
+      if (uri.scheme == 'file' || uri.scheme.isEmpty) {
+        final file = File(uri.toFilePath());
+        if (await file.exists()) {
+          content = await file.readAsString();
+        }
+      }
+
+      if (content.isNotEmpty && mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => Directionality(
+              textDirection: TextDirection.rtl,
+              child: InterviewFormScreen(initialIcsContent: content),
+            ),
+          ),
+        ).then((result) {
+          if (result != null && result is InterviewItem) {
+            setState(() {
+              _interviews.add(result);
+              _interviews.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+            });
+            _saveInterviews();
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadInterviews() async {
@@ -265,6 +314,96 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     final dayName = days[date.weekday - 1];
     final monthName = months[date.month - 1];
     return 'יום $dayName, ${date.day} ב$monthName ${date.year}';
+  }
+
+  void _showHelpDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.help_outline_rounded, color: Colors.indigo, size: 28),
+              SizedBox(width: 8),
+              Text('מדריך לשימוש באפליקציה', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildHelpStep(
+                  '1',
+                  'קליטת זימון ישירות מהמייל (.ics)',
+                  'כאשר מגיע מייל זימון (למשל מ-Gmail או Outlook), מצורף אליו קובץ יומן (לרוב בשם invite.ics). לחץ עליו להורדה/פתיחה, ובחר לפתוח אותו באמצעות "Job Tracker Pro". האפליקציה תפתח ישירות את הטופס כשהחברה, התפקיד, התאריך וקישור הפגישה כבר מלאים!',
+                ),
+                const SizedBox(height: 12),
+                _buildHelpStep(
+                  '2',
+                  'שמירה מהירה וסנכרון ליומן',
+                  'לאחר בדיקה קצרה של הפרטים בטופס, לחץ על "שמור ראיון". הראיון יתווסף לרשימה ולמדדים, ומיד תוכל ללחוץ על כפתור "ליומן" כדי להכניס אותו ישירות ליומן Google במכשיר שלך.',
+                ),
+                const SizedBox(height: 12),
+                _buildHelpStep(
+                  '3',
+                  'התחברות מהירה לשיחה בלחיצה אחת',
+                  'בכרטיס הראיון יופיע כפתור ייעודי: "כנס ל-זום", "כנס ל-טימס" או "כנס ל-Google Meet". לחיצה עליו פותחת ישירות את השיחה ללא צורך לחפש קישורים במייל.',
+                ),
+                const SizedBox(height: 12),
+                _buildHelpStep(
+                  '4',
+                  'הוספה ידנית או עדכון סטטוס',
+                  'ניתן להוסיף ראיון ידנית בכל רגע דרך כפתור "ראיון חדש" למטה, לעדכן תוצאות (עבר בהצלחה / ממתין לתשובה), ולסמן אם נמסר מבחן בית או סוכמו ציפיות שכר.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.indigo,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('הבנתי, תודה!'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHelpStep(String number, String title, String body) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: Colors.indigo.shade50,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            number,
+            style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold, fontSize: 13),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+              const SizedBox(height: 2),
+              Text(body, style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.35)),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _addToCalendar(InterviewItem item) async {
@@ -545,6 +684,13 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0.5,
+        actions: [
+          IconButton(
+            tooltip: 'מדריך שימוש',
+            icon: const Icon(Icons.help_outline_rounded, color: Colors.indigo),
+            onPressed: _showHelpDialog,
+          ),
+        ],
       ),
       body: CustomScrollView(
         slivers: [
@@ -561,7 +707,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                     const SizedBox(height: 12),
                     const Text('אין ראיונות ברשימה', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    const Text('לחץ על ראיון חדש וטען את קובץ הזימון מהמייל!', style: TextStyle(color: Colors.grey)),
+                    const Text('פתח קובץ ICS מהמייל או לחץ על סימן השאלה למעלה להסבר!', style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
@@ -778,11 +924,13 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
 }
 
 // ----------------------------------------------------
-// טופס ומפענח קובצי .ics
+// טופס ומפענח קובצי ICS
 // ----------------------------------------------------
 class InterviewFormScreen extends StatefulWidget {
   final InterviewItem? item;
-  const InterviewFormScreen({super.key, this.item});
+  final String? initialIcsContent;
+
+  const InterviewFormScreen({super.key, this.item, this.initialIcsContent});
 
   @override
   State<InterviewFormScreen> createState() => _InterviewFormScreenState();
@@ -823,6 +971,12 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
     _platform = item?.platform ?? 'זום';
     _hasHomeAssignment = item?.hasHomeAssignment ?? false;
     _salaryCoordinated = item?.salaryCoordinated ?? false;
+
+    if (widget.initialIcsContent != null && widget.initialIcsContent!.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _parseIcsContent(widget.initialIcsContent!);
+      });
+    }
   }
 
   @override
@@ -836,32 +990,12 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
     super.dispose();
   }
 
-  Future<void> _pickAndParseIcsFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.any,
-      );
-
-      if (result == null || result.files.single.path == null) return;
-
-      final file = File(result.files.single.path!);
-      final content = await file.readAsString();
-      _parseIcsContent(content);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('שגיאה בקריאת הקובץ. ודא שנבחר קובץ זימון תקין (.ics)')),
-      );
-    }
-  }
-
   void _parseIcsContent(String ics) {
     String summary = '';
     String location = '';
     String description = '';
     String dtStart = '';
 
-    // פיענוח שורות מקופלות ב-ICS (Unfolding)
     final unfolded = ics.replaceAll(RegExp(r'\r?\n[ \t]'), '');
     final lines = unfolded.split(RegExp(r'\r?\n'));
 
@@ -880,7 +1014,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
       }
     }
 
-    // 1. פענוח תאריך ושעה מובנים (למשל 20261015T140000Z)
     if (dtStart.isNotEmpty) {
       try {
         final cleanDt = dtStart.replaceAll(RegExp(r'[^0-9T]'), '');
@@ -895,7 +1028,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
             final h = int.parse(t.substring(0, 2));
             final min = int.parse(t.substring(2, 4));
             
-            // המרה משעת UTC לשעה מקומית במידה ויש סיומת Z
             if (dtStart.endsWith('Z')) {
               _dateTime = DateTime.utc(y, m, day, h, min).toLocal();
             } else {
@@ -906,9 +1038,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
       } catch (_) {}
     }
 
-    // 2. פיענוח כותרת (Summary) לחברה ולתפקיד
     if (summary.isNotEmpty) {
-      // חלוקה לפי תווים מקובלים כמו - , : או |
       final splitParts = summary.split(RegExp(r'[-:|]'));
       if (splitParts.length >= 2) {
         _companyController.text = splitParts[0].trim();
@@ -918,7 +1048,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
       }
     }
 
-    // 3. פיענוח מיקום / קישור ופלטפורמה
     final fullTextToScan = '$location\n$description';
     final urlRegex = RegExp(r'(https?:\/\/[^\s<>"\)]+)');
     final allUrls = urlRegex.allMatches(fullTextToScan).map((m) => m.group(0)!).toList();
@@ -946,21 +1075,19 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
       _platform = 'פרונטלי';
     }
 
-    // 4. איתור טלפון
     final phoneRegex = RegExp(r'\b(05\d[-\s]?\d{3}[-\s]?\d{4}|\+?972[-\s]?5\d[-\s]?\d{3}[-\s]?\d{4})\b');
     final phoneMatch = phoneRegex.firstMatch(fullTextToScan);
     if (phoneMatch != null) {
       _contactPhoneController.text = phoneMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
     }
 
-    // 5. הערות
     if (description.isNotEmpty) {
       _notesController.text = description;
     }
 
     setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('קובץ הזימון נטען בהצלחה! פלטפורמה: $_platform')),
+      SnackBar(content: Text('קובץ הזימון נטען! פלטפורמה: $_platform')),
     );
   }
 
@@ -997,7 +1124,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.item == null ? 'הוספת ראיון מהירה' : 'עריכת ראיון'),
+        title: Text(widget.item == null ? 'הוספת ראיון' : 'עריכת ראיון'),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -1007,20 +1134,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF4338CA),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: _pickAndParseIcsFile,
-                icon: const Icon(Icons.file_present_rounded, color: Colors.amberAccent),
-                label: const Text(
-                  'טען קובץ זימון מהמייל (.ics)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-              ),
-              const SizedBox(height: 16),
               TextFormField(
                 controller: _companyController,
                 textAlign: TextAlign.right,
@@ -1176,7 +1289,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 maxLines: 4,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
-                  labelText: 'דגשים, תוכן המייל המלא והערות',
+                  labelText: 'דגשים והערות',
                   border: OutlineInputBorder(),
                   suffixIcon: Icon(Icons.note_alt_outlined),
                 ),
