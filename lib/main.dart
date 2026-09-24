@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -17,41 +16,17 @@ class InterviewApp extends StatelessWidget {
     return MaterialApp(
       title: 'מעקב ראיונות עבודה',
       debugShowCheckedModeBanner: false,
-      locale: const Locale('he', 'IL'),
-      supportedLocales: const [
-        Locale('he', 'IL'),
-        Locale('en', 'US'),
-      ],
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
       theme: ThemeData(
         useMaterial3: true,
         colorSchemeSeed: Colors.indigo,
         scaffoldBackgroundColor: const Color(0xFFF8F9FD),
-        cardTheme: CardTheme(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: Colors.grey.shade200),
-          ),
-          color: Colors.white,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade300),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200),
-          ),
-        ),
       ),
+      builder: (context, child) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: child!,
+        );
+      },
       home: const InterviewListScreen(),
     );
   }
@@ -146,7 +121,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
   Future<void> _addToCalendar(InterviewItem item) async {
     final startTime = item.dateTime.millisecondsSinceEpoch;
     final endTime = item.dateTime.add(const Duration(hours: 1)).millisecondsSinceEpoch;
-    final title = Uri.encodeComponent('ראיון עבודה: ${item.company} - ${item.position}');
+    final title = Uri.encodeComponent('ראיון: ${item.company} - ${item.position}');
     final desc = Uri.encodeComponent('איש קשר: ${item.contactName} ${item.contactPhone}\n${item.notes}');
     final loc = Uri.encodeComponent(item.locationOrLink);
 
@@ -157,10 +132,10 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     if (await canLaunchUrl(calendarUri)) {
       await launchUrl(calendarUri);
     } else {
-      final genericUri = Uri.parse(
-        'https://www.google.com/calendar/render?action=TEMPLATE&text=$title&details=$desc&location=$loc&dates=${item.dateTime.toUtc().toIso8601String().replaceAll(RegExp(r'[-:]'), '').split('.').first}Z/${item.dateTime.add(const Duration(hours: 1)).toUtc().toIso8601String().replaceAll(RegExp(r'[-:]'), '').split('.').first}Z',
+      final googleUrl = Uri.parse(
+        'https://calendar.google.com/calendar/render?action=TEMPLATE&text=$title&details=$desc&location=$loc',
       );
-      await launchUrl(genericUri, mode: LaunchMode.externalApplication);
+      await launchUrl(googleUrl, mode: LaunchMode.externalApplication);
     }
   }
 
@@ -208,7 +183,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
       case 'בוטל/נדחה':
         return Colors.red.shade600;
       case 'ממתין לתשובה':
-        return Colors.amber.shade800;
+        return Colors.orange.shade800;
       default:
         return Colors.indigo.shade600;
     }
@@ -216,16 +191,14 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'he');
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('מעקב ראיונות עבודה', style: TextStyle(fontWeight: FontWeight.bold)),
         centerTitle: true,
         backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shadowColor: Colors.black.withOpacity(0.05),
-        elevation: 2,
+        elevation: 1,
       ),
       body: _interviews.isEmpty
           ? Center(
@@ -236,7 +209,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                   const SizedBox(height: 16),
                   const Text(
                     'אין ראיונות שמורים כרגע',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
                   const Text(
@@ -247,7 +220,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
               ),
             )
           : ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.all(16),
               itemCount: _interviews.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
@@ -255,6 +228,12 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                 final statusColor = _getStatusColor(item.status);
 
                 return Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(color: Colors.grey.shade200),
+                  ),
+                  color: Colors.white,
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
@@ -451,7 +430,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
       initialDate: _dateTime,
       firstDate: DateTime(2024),
       lastDate: DateTime(2030),
-      locale: const Locale('he', 'IL'),
     );
     if (pickedDate == null) return;
 
@@ -475,7 +453,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final dateFormat = DateFormat('dd/MM/yyyy HH:mm', 'he');
+    final dateFormat = DateFormat('dd/MM/yyyy HH:mm');
 
     return Scaffold(
       appBar: AppBar(
@@ -493,6 +471,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 initialValue: _company,
                 decoration: const InputDecoration(
                   labelText: 'שם החברה *',
+                  border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.business),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
@@ -503,6 +482,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 initialValue: _position,
                 decoration: const InputDecoration(
                   labelText: 'תפקיד *',
+                  border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.work_outline),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
@@ -511,13 +491,13 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               const SizedBox(height: 14),
               InkWell(
                 onTap: _pickDateTime,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    border: Border.pad(BorderSide(color: Colors.grey.shade300)),
-                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
@@ -545,6 +525,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 value: _status,
                 decoration: const InputDecoration(
                   labelText: 'סטטוס',
+                  border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.flag_outlined),
                 ),
                 items: _statusOptions
@@ -557,6 +538,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 initialValue: _contactName,
                 decoration: const InputDecoration(
                   labelText: 'איש / אשת קשר',
+                  border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.person_outline),
                 ),
                 onSaved: (val) => _contactName = val?.trim() ?? '',
@@ -567,6 +549,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
                   labelText: 'טלפון איש קשר',
+                  border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.phone_outlined),
                 ),
                 onSaved: (val) => _contactPhone = val?.trim() ?? '',
@@ -576,6 +559,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 initialValue: _locationOrLink,
                 decoration: const InputDecoration(
                   labelText: 'מיקום פיזי / קישור לפגישה (Zoom, Teams)',
+                  border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.link_rounded),
                 ),
                 onSaved: (val) => _locationOrLink = val?.trim() ?? '',
@@ -586,6 +570,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'דגשים, ציפיות שכר והערות',
+                  border: OutlineInputBorder(),
                   alignLabelWithHint: true,
                   prefixIcon: Icon(Icons.note_alt_outlined),
                 ),
