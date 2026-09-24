@@ -131,6 +131,17 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     await prefs.setString('saved_interviews', encoded);
   }
 
+  String _getHebrewDateString(DateTime date) {
+    const days = ['שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת', 'ראשון'];
+    const months = [
+      'ינואר', 'פברואר', 'מרץ', 'אפריל', 'מאי', 'יוני',
+      'יולי', 'אוגוסט', 'ספטמבר', 'אוקטובר', 'נובמבר', 'דצמבר'
+    ];
+    final dayName = days[date.weekday - 1];
+    final monthName = months[date.month - 1];
+    return 'יום $dayName, ${date.day} ב$monthName ${date.year}';
+  }
+
   Future<void> _addToCalendar(InterviewItem item) async {
     final startTime = item.dateTime.millisecondsSinceEpoch;
     final endTime = item.dateTime.add(const Duration(hours: 1)).millisecondsSinceEpoch;
@@ -276,7 +287,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    DateFormat('EEEE, d MMMM', 'he').format(now),
+                    _getHebrewDateString(now),
                     style: TextStyle(color: Colors.indigo.shade100, fontSize: 13),
                   ),
                 ],
@@ -612,13 +623,13 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                 ),
               ),
             ),
-          SliverToBoxAdapter(
+          const SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.only(top: 20, bottom: 90),
+              padding: EdgeInsets.only(top: 20, bottom: 90),
               child: Center(
                 child: Text(
                   'פותח ע"י רוני שניידר • גרסה 1.2',
-                  style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.w600),
+                  style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w600),
                 ),
               ),
             ),
