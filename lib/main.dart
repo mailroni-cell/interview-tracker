@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' show DateFormat;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -148,7 +147,7 @@ class _SplashScreenState extends State<SplashScreen> {
 }
 
 // ----------------------------------------------------
-// מודל נתוני הראיון
+// מודל נתונים מעודכן
 // ----------------------------------------------------
 class InterviewItem {
   String id;
@@ -164,6 +163,15 @@ class InterviewItem {
   bool isOnline;
   bool hasHomeAssignment;
   bool salaryCoordinated;
+  String agreedSalary;
+  bool isHybrid;
+  int homeDaysPerWeek;
+  int totalWorkDaysPerWeek;
+  String workHours;
+  String vehicleBenefit;
+  bool hasStudyFund;
+  String studyFundStart;
+  String mealBenefit; // "תן ביס / סיבוס", "חדר אוכל", "אש\"ל / החזר יומי", "ללא סבסוד"
 
   InterviewItem({
     required this.id,
@@ -179,6 +187,15 @@ class InterviewItem {
     this.isOnline = true,
     this.hasHomeAssignment = false,
     this.salaryCoordinated = false,
+    this.agreedSalary = '',
+    this.isHybrid = false,
+    this.homeDaysPerWeek = 2,
+    this.totalWorkDaysPerWeek = 5,
+    this.workHours = 'משרה מלאה (8:00–17:00)',
+    this.vehicleBenefit = 'ללא רכב',
+    this.hasStudyFund = false,
+    this.studyFundStart = 'מהיום הראשון',
+    this.mealBenefit = 'ללא סבסוד',
   });
 
   Map<String, dynamic> toMap() {
@@ -196,6 +213,15 @@ class InterviewItem {
       'isOnline': isOnline,
       'hasHomeAssignment': hasHomeAssignment,
       'salaryCoordinated': salaryCoordinated,
+      'agreedSalary': agreedSalary,
+      'isHybrid': isHybrid,
+      'homeDaysPerWeek': homeDaysPerWeek,
+      'totalWorkDaysPerWeek': totalWorkDaysPerWeek,
+      'workHours': workHours,
+      'vehicleBenefit': vehicleBenefit,
+      'hasStudyFund': hasStudyFund,
+      'studyFundStart': studyFundStart,
+      'mealBenefit': mealBenefit,
     };
   }
 
@@ -214,6 +240,15 @@ class InterviewItem {
       isOnline: map['isOnline'] ?? true,
       hasHomeAssignment: map['hasHomeAssignment'] ?? false,
       salaryCoordinated: map['salaryCoordinated'] ?? false,
+      agreedSalary: map['agreedSalary'] ?? '',
+      isHybrid: map['isHybrid'] ?? false,
+      homeDaysPerWeek: map['homeDaysPerWeek'] ?? 2,
+      totalWorkDaysPerWeek: map['totalWorkDaysPerWeek'] ?? 5,
+      workHours: map['workHours'] ?? 'משרה מלאה (8:00–17:00)',
+      vehicleBenefit: map['vehicleBenefit'] ?? 'ללא רכב',
+      hasStudyFund: map['hasStudyFund'] ?? false,
+      studyFundStart: map['studyFundStart'] ?? 'מהיום הראשון',
+      mealBenefit: map['mealBenefit'] ?? 'ללא סבסוד',
     );
   }
 }
@@ -266,97 +301,21 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
     return 'יום $dayName, ${date.day} ב$monthName ${date.year}';
   }
 
-  void _showHelpDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => Directionality(
-        textDirection: TextDirection.rtl,
-        child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
-            children: [
-              Icon(Icons.help_outline_rounded, color: Colors.indigo, size: 28),
-              SizedBox(width: 8),
-              Text('מדריך לשימוש באפליקציה', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-            ],
-          ),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildHelpStep(
-                  '1',
-                  'קליטת זימון בקליק אחד',
-                  'כשמתקבל מייל זימון או הודעה (בוואטסאפ או במייל), סמן את הטקסט או את תוכן קובץ היומן ולחץ "העתק". לאחר מכן פתח את האפליקציה, לחץ "ראיון חדש" ולחץ על הכפתור הסגול בראש המסך – כל הפרטים יישאבו מיידית!',
-                ),
-                const SizedBox(height: 12),
-                _buildHelpStep(
-                  '2',
-                  'הוספה ליומן הטלפון',
-                  'בכרטיס של כל ראיון מופיע כפתור "ליומן". לחיצה עליו מעבירה מיד את הפגישה, השעה והקישור ליומן המכשיר שלך.',
-                ),
-                const SizedBox(height: 12),
-                _buildHelpStep(
-                  '3',
-                  'כניסה מהירה לפגישה',
-                  'במידה ויש קישור, יופיע כפתור בולט: "כנס ל-זום", "כנס ל-טימס" או "כנס ל-Google Meet". לחיצה אחת פותחת את השיחה ישירות.',
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx),
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.indigo,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: const Text('סגור'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHelpStep(String number, String title, String body) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: Colors.indigo.shade50,
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            number,
-            style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.bold, fontSize: 13),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-              const SizedBox(height: 2),
-              Text(body, style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.35)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Future<void> _addToCalendar(InterviewItem item) async {
     final startTime = item.dateTime.millisecondsSinceEpoch;
     final endTime = item.dateTime.add(const Duration(hours: 1)).millisecondsSinceEpoch;
     final title = Uri.encodeComponent('ראיון (${item.platform}): ${item.company} - ${item.position}');
-    final desc = Uri.encodeComponent(
-      'פלטפורמה: ${item.platform}\nאיש קשר: ${item.contactName} ${item.contactPhone}\nמיקום/קישור: ${item.locationOrLink}\nהערות: ${item.notes}',
-    );
+
+    String descText = 'פלטפורמה: ${item.platform}\n';
+    if (item.contactName.isNotEmpty) descText += 'איש קשר: ${item.contactName} ${item.contactPhone}\n';
+    if (item.salaryCoordinated && item.agreedSalary.isNotEmpty) descText += 'שכר: ${item.agreedSalary}\n';
+    if (item.vehicleBenefit != 'ללא רכב') descText += 'רכב: ${item.vehicleBenefit}\n';
+    if (item.mealBenefit != 'ללא סבסוד') descText += 'הסעדה: ${item.mealBenefit}\n';
+    if (item.hasStudyFund) descText += 'קרן השתלמות: ${item.studyFundStart}\n';
+    if (item.isHybrid) descText += 'מתכונת: היברידי (${item.homeDaysPerWeek} ימים מהבית)\n';
+    if (item.notes.isNotEmpty) descText += 'הערות: ${item.notes}\n';
+
+    final desc = Uri.encodeComponent(descText);
     final loc = Uri.encodeComponent(item.locationOrLink);
 
     final calendarUri = Uri.parse(
@@ -628,13 +587,6 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0.5,
-        actions: [
-          IconButton(
-            tooltip: 'מדריך שימוש',
-            icon: const Icon(Icons.help_outline_rounded, color: Colors.indigo),
-            onPressed: _showHelpDialog,
-          ),
-        ],
       ),
       body: CustomScrollView(
         slivers: [
@@ -647,11 +599,11 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.mark_email_read_outlined, size: 60, color: Colors.indigo.shade200),
+                    Icon(Icons.work_outline_rounded, size: 60, color: Colors.indigo.shade200),
                     const SizedBox(height: 12),
                     const Text('אין ראיונות ברשימה', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    const Text('העתק זימון מהמייל או לחץ על סימן השאלה להסבר!', style: TextStyle(color: Colors.grey)),
+                    const Text('לחץ על "ראיון חדש" כדי להתחיל לתעד בקלות!', style: TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
@@ -762,36 +714,78 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                                 ],
                               ),
                             ],
-                            if (item.locationOrLink.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Icon(Icons.link_rounded, size: 15, color: Colors.indigo.shade400),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: Text(
-                                      item.locationOrLink,
-                                      style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                            const SizedBox(height: 10),
+                            const SizedBox(height: 8),
                             Wrap(
                               spacing: 6,
+                              runSpacing: 4,
                               children: [
+                                if (item.salaryCoordinated)
+                                  Chip(
+                                    avatar: const Icon(Icons.payments_outlined, size: 14, color: Colors.teal),
+                                    label: Text(
+                                      item.agreedSalary.isNotEmpty ? 'שכר: ${item.agreedSalary}' : 'שכר: סוכם',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.teal),
+                                    ),
+                                    backgroundColor: Colors.teal.shade50,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                if (item.vehicleBenefit != 'ללא רכב')
+                                  Chip(
+                                    avatar: const Icon(Icons.directions_car_rounded, size: 14, color: Colors.indigo),
+                                    label: Text(
+                                      item.vehicleBenefit,
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.indigo),
+                                    ),
+                                    backgroundColor: Colors.indigo.shade50,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                if (item.mealBenefit != 'ללא סבסוד')
+                                  Chip(
+                                    avatar: const Icon(Icons.restaurant_rounded, size: 14, color: Colors.deepOrange),
+                                    label: Text(
+                                      item.mealBenefit,
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                                    ),
+                                    backgroundColor: Colors.deepOrange.shade50,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                if (item.hasStudyFund)
+                                  Chip(
+                                    avatar: const Icon(Icons.savings_outlined, size: 14, color: Colors.amber.shade900),
+                                    label: Text(
+                                      'קרן השתלמות: ${item.studyFundStart}',
+                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                    ),
+                                    backgroundColor: Colors.amber.shade50,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                if (item.isHybrid)
+                                  Chip(
+                                    avatar: const Icon(Icons.home_work_outlined, size: 14, color: Colors.deepPurple),
+                                    label: Text(
+                                      'היברידי (${item.homeDaysPerWeek} ימים מהבית)',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.deepPurple),
+                                    ),
+                                    backgroundColor: Colors.deepPurple.shade50,
+                                    visualDensity: VisualDensity.compact,
+                                  )
+                                else
+                                  Chip(
+                                    avatar: const Icon(Icons.apartment_rounded, size: 14, color: Colors.blueGrey),
+                                    label: const Text('מהמשרד בלבד', style: TextStyle(fontSize: 11)),
+                                    backgroundColor: Colors.blueGrey.shade50,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                Chip(
+                                  avatar: const Icon(Icons.calendar_view_week_rounded, size: 14, color: Colors.blueGrey),
+                                  label: Text('${item.totalWorkDaysPerWeek} ימים בשבוע', style: const TextStyle(fontSize: 11)),
+                                  backgroundColor: Colors.grey.shade100,
+                                  visualDensity: VisualDensity.compact,
+                                ),
                                 if (item.hasHomeAssignment)
                                   Chip(
                                     label: const Text('מבחן בית: הוגש', style: TextStyle(fontSize: 11)),
                                     backgroundColor: Colors.amber.shade50,
-                                    visualDensity: VisualDensity.compact,
-                                  ),
-                                if (item.salaryCoordinated)
-                                  Chip(
-                                    label: const Text('תיאום שכר: סוכם', style: TextStyle(fontSize: 11)),
-                                    backgroundColor: Colors.teal.shade50,
                                     visualDensity: VisualDensity.compact,
                                   ),
                               ],
@@ -868,7 +862,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
 }
 
 // ----------------------------------------------------
-// טופס ומפענח זימונים (ICS וטקסט)
+// טופס מהיר עם שכר, רכב, הסעדה, קרן השתלמות, היברידיות ושעות
 // ----------------------------------------------------
 class InterviewFormScreen extends StatefulWidget {
   final InterviewItem? item;
@@ -887,15 +881,33 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
   late TextEditingController _contactPhoneController;
   late TextEditingController _locationController;
   late TextEditingController _notesController;
+  late TextEditingController _salaryController;
 
   late DateTime _dateTime;
   late String _status;
   late String _platform;
   late bool _hasHomeAssignment;
   late bool _salaryCoordinated;
+  late bool _isHybrid;
+  late int _homeDaysPerWeek;
+  late int _totalWorkDaysPerWeek;
+  late String _workHours;
+  late String _vehicleBenefit;
+  late bool _hasStudyFund;
+  late String _studyFundStart;
+  late String _mealBenefit;
 
   final List<String> _statusOptions = ['נקבע', 'התקיים', 'ממתין לתשובה', 'עבר בהצלחה', 'בוטל/נדחה'];
   final List<String> _platformOptions = ['זום', 'טימס', 'Google Meet', 'פרונטלי'];
+  final List<String> _vehicleOptions = ['ללא רכב', 'רכב חברה / ליסינג', 'אחזקת רכב'];
+  final List<String> _mealOptions = ['ללא סבסוד', 'תן ביס / סיבוס', 'חדר אוכל', 'אש"ל / החזר יומי'];
+  final List<String> _studyFundOptions = ['מהיום הראשון', 'אחרי 3 חודשים', 'אחרי 6 חודשים'];
+  final List<String> _workHoursOptions = [
+    'משרה מלאה (8:00–17:00)',
+    'משרה מלאה (9:00–18:00)',
+    'גמיש / לפי משימות',
+    'משמרות / כוננויות'
+  ];
 
   @override
   void initState() {
@@ -907,12 +919,21 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
     _contactPhoneController = TextEditingController(text: item?.contactPhone ?? '');
     _locationController = TextEditingController(text: item?.locationOrLink ?? '');
     _notesController = TextEditingController(text: item?.notes ?? '');
+    _salaryController = TextEditingController(text: item?.agreedSalary ?? '');
 
     _dateTime = item?.dateTime ?? DateTime.now().add(const Duration(days: 1));
     _status = item?.status ?? 'נקבע';
     _platform = item?.platform ?? 'זום';
     _hasHomeAssignment = item?.hasHomeAssignment ?? false;
     _salaryCoordinated = item?.salaryCoordinated ?? false;
+    _isHybrid = item?.isHybrid ?? false;
+    _homeDaysPerWeek = item?.homeDaysPerWeek ?? 2;
+    _totalWorkDaysPerWeek = item?.totalWorkDaysPerWeek ?? 5;
+    _workHours = item?.workHours ?? 'משרה מלאה (8:00–17:00)';
+    _vehicleBenefit = item?.vehicleBenefit ?? 'ללא רכב';
+    _hasStudyFund = item?.hasStudyFund ?? false;
+    _studyFundStart = item?.studyFundStart ?? 'מהיום הראשון';
+    _mealBenefit = item?.mealBenefit ?? 'ללא סבסוד';
   }
 
   @override
@@ -923,193 +944,8 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
     _contactPhoneController.dispose();
     _locationController.dispose();
     _notesController.dispose();
+    _salaryController.dispose();
     super.dispose();
-  }
-
-  Future<void> _fetchAndParseFromClipboard() async {
-    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = clipboardData?.text ?? '';
-
-    if (text.trim().isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('לא נמצא טקסט מועתק. העתק את הזימון או קובץ ה-ICS תחילה!')),
-      );
-      return;
-    }
-
-    if (text.contains('BEGIN:VCALENDAR') || text.contains('DTSTART')) {
-      _parseIcsContent(text);
-    } else {
-      _parsePlainText(text);
-    }
-  }
-
-  void _parseIcsContent(String ics) {
-    String summary = '';
-    String location = '';
-    String description = '';
-    String dtStart = '';
-
-    final unfolded = ics.replaceAll(RegExp(r'\r?\n[ \t]'), '');
-    final lines = unfolded.split(RegExp(r'\r?\n'));
-
-    for (var line in lines) {
-      if (line.startsWith('SUMMARY:')) {
-        summary = line.substring(8).trim();
-      } else if (line.startsWith('LOCATION:')) {
-        location = line.substring(9).trim().replaceAll(r'\,', ',');
-      } else if (line.startsWith('DESCRIPTION:')) {
-        description = line.substring(12).trim().replaceAll(r'\n', '\n').replaceAll(r'\,', ',');
-      } else if (line.startsWith('DTSTART')) {
-        final parts = line.split(':');
-        if (parts.length > 1) {
-          dtStart = parts.last.trim();
-        }
-      }
-    }
-
-    if (dtStart.isNotEmpty) {
-      try {
-        final cleanDt = dtStart.replaceAll(RegExp(r'[^0-9T]'), '');
-        if (cleanDt.contains('T')) {
-          final p = cleanDt.split('T');
-          final d = p[0];
-          final t = p[1];
-          if (d.length >= 8 && t.length >= 4) {
-            final y = int.parse(d.substring(0, 4));
-            final m = int.parse(d.substring(4, 6));
-            final day = int.parse(d.substring(6, 8));
-            final h = int.parse(t.substring(0, 2));
-            final min = int.parse(t.substring(2, 4));
-            
-            if (dtStart.endsWith('Z')) {
-              _dateTime = DateTime.utc(y, m, day, h, min).toLocal();
-            } else {
-              _dateTime = DateTime(y, m, day, h, min);
-            }
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (summary.isNotEmpty) {
-      final splitParts = summary.split(RegExp(r'[-:|]'));
-      if (splitParts.length >= 2) {
-        _companyController.text = splitParts[0].trim();
-        _positionController.text = splitParts.sublist(1).join(' - ').trim();
-      } else {
-        _positionController.text = summary;
-      }
-    }
-
-    final fullTextToScan = '$location\n$description';
-    final urlRegex = RegExp(r'(https?:\/\/[^\s<>"\)]+)');
-    final allUrls = urlRegex.allMatches(fullTextToScan).map((m) => m.group(0)!).toList();
-
-    String meetingUrl = '';
-    for (var u in allUrls) {
-      final lu = u.toLowerCase();
-      if (lu.contains('teams.microsoft.com') || lu.contains('meet.google.com') || lu.contains('zoom.us')) {
-        meetingUrl = u;
-        break;
-      }
-    }
-    if (meetingUrl.isEmpty && allUrls.isNotEmpty) {
-      meetingUrl = allUrls.first;
-    }
-
-    if (meetingUrl.isNotEmpty) {
-      _locationController.text = meetingUrl;
-      final lu = meetingUrl.toLowerCase();
-      if (lu.contains('teams')) _platform = 'טימס';
-      else if (lu.contains('zoom')) _platform = 'זום';
-      else if (lu.contains('meet.google')) _platform = 'Google Meet';
-    } else if (location.isNotEmpty) {
-      _locationController.text = location;
-      _platform = 'פרונטלי';
-    }
-
-    final phoneRegex = RegExp(r'\b(05\d[-\s]?\d{3}[-\s]?\d{4}|\+?972[-\s]?5\d[-\s]?\d{3}[-\s]?\d{4})\b');
-    final phoneMatch = phoneRegex.firstMatch(fullTextToScan);
-    if (phoneMatch != null) {
-      _contactPhoneController.text = phoneMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
-    }
-
-    if (description.isNotEmpty) {
-      _notesController.text = description;
-    }
-
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('נתוני הזימון (ICS) חולצו! פלטפורמה: $_platform')),
-    );
-  }
-
-  void _parsePlainText(String rawText) {
-    final urlRegex = RegExp(r'(https?:\/\/[^\s<>"\)]+)');
-    final allUrls = urlRegex.allMatches(rawText).map((m) => m.group(0)!).toList();
-
-    String meetingUrl = '';
-    for (var u in allUrls) {
-      final lu = u.toLowerCase();
-      if (lu.contains('teams.microsoft.com') || lu.contains('meet.google.com') || lu.contains('zoom.us')) {
-        meetingUrl = u;
-        break;
-      }
-    }
-    if (meetingUrl.isEmpty && allUrls.isNotEmpty) {
-      meetingUrl = allUrls.first;
-    }
-
-    if (meetingUrl.isNotEmpty) {
-      _locationController.text = meetingUrl;
-      final lu = meetingUrl.toLowerCase();
-      if (lu.contains('teams')) _platform = 'טימס';
-      else if (lu.contains('zoom')) _platform = 'זום';
-      else if (lu.contains('meet.google')) _platform = 'Google Meet';
-    }
-
-    final phoneRegex = RegExp(r'\b(05\d[-\s]?\d{3}[-\s]?\d{4}|\+?972[-\s]?5\d[-\s]?\d{3}[-\s]?\d{4}|0[23489][-\s]?\d{7})\b');
-    final phoneMatch = phoneRegex.firstMatch(rawText);
-    if (phoneMatch != null) {
-      _contactPhoneController.text = phoneMatch.group(0)!.replaceAll(RegExp(r'\s+'), '');
-    }
-
-    final timeRegex = RegExp(r'\b([01]?\d|2[0-3])[:.]([0-5]\d)\b');
-    final timeMatch = timeRegex.firstMatch(rawText);
-    int hour = _dateTime.hour;
-    int minute = _dateTime.minute;
-    if (timeMatch != null) {
-      hour = int.tryParse(timeMatch.group(1)!) ?? hour;
-      minute = int.tryParse(timeMatch.group(2)!) ?? minute;
-    }
-
-    final dateRegex = RegExp(r'\b(0?[1-9]|[12]\d|3[01])[\/\.\-](0?[1-9]|1[012])([\/\.\-](\d{2,4}))?\b');
-    final dateMatch = dateRegex.firstMatch(rawText);
-    int year = _dateTime.year;
-    int month = _dateTime.month;
-    int day = _dateTime.day;
-
-    if (dateMatch != null) {
-      day = int.tryParse(dateMatch.group(1)!) ?? day;
-      month = int.tryParse(dateMatch.group(2)!) ?? month;
-      if (dateMatch.group(4) != null) {
-        int y = int.tryParse(dateMatch.group(4)!) ?? year;
-        year = y < 100 ? 2000 + y : y;
-      }
-    }
-
-    try {
-      _dateTime = DateTime(year, month, day, hour, minute);
-    } catch (_) {}
-
-    _notesController.text = rawText.trim();
-
-    setState(() {});
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('הפרטים חולצו מהזיכרון! פלטפורמה: $_platform')),
-    );
   }
 
   Future<void> _pickDateTime() async {
@@ -1145,7 +981,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.item == null ? 'הוספת ראיון מהירה' : 'עריכת ראיון'),
+        title: Text(widget.item == null ? 'הוספת ראיון' : 'עריכת ראיון'),
         centerTitle: true,
       ),
       body: SingleChildScrollView(
@@ -1155,27 +991,13 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: const Color(0xFF4338CA),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: _fetchAndParseFromClipboard,
-                icon: const Icon(Icons.flash_on_rounded, color: Colors.amberAccent),
-                label: const Text(
-                  'שאב נתונים אוטומטית (מייל או קובץ ICS)',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-              ),
-              const SizedBox(height: 16),
               TextFormField(
                 controller: _companyController,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
                   labelText: 'שם החברה *',
                   border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.business),
+                  prefixIcon: Icon(Icons.business_rounded),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
               ),
@@ -1186,7 +1008,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'תפקיד *',
                   border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.work_outline),
+                  prefixIcon: Icon(Icons.work_outline_rounded),
                 ),
                 validator: (val) => val == null || val.trim().isEmpty ? 'שדה חובה' : null,
               ),
@@ -1220,7 +1042,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('סוג הפגישה / פלטפורמה:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              const Text('סוג הפגישה:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 6),
               Wrap(
                 spacing: 8,
@@ -1245,7 +1067,17 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _locationController,
+                textAlign: TextAlign.right,
+                decoration: InputDecoration(
+                  labelText: _platform == 'פרונטלי' ? 'כתובת הגעה / משרד' : 'קישור לפגישה (Zoom / Teams / Meet)',
+                  border: const OutlineInputBorder(),
+                  prefixIcon: Icon(_platform == 'פרונטלי' ? Icons.place_outlined : Icons.link_rounded),
+                ),
+              ),
+              const SizedBox(height: 16),
               const Text('סטטוס הראיון:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               const SizedBox(height: 6),
               Wrap(
@@ -1262,39 +1094,221 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 }).toList(),
               ),
               const SizedBox(height: 16),
+
+              // תנאי משרה: שכר, רכב, אש"ל, קרן השתלמות והיברידיות
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.indigo.shade50.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: Colors.indigo.shade100),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SwitchListTile(
-                      dense: true,
-                      title: const Text('נמסר מבחן בית / משימה מקצועית?'),
-                      value: _hasHomeAssignment,
-                      onChanged: (val) => setState(() => _hasHomeAssignment = val),
+                    const Text(
+                      'תנאי העסקה ושכר',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.indigo),
                     ),
-                    const Divider(height: 1),
+                    const SizedBox(height: 8),
                     SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
                       dense: true,
                       title: const Text('סוכמו ציפיות שכר?'),
                       value: _salaryCoordinated,
                       onChanged: (val) => setState(() => _salaryCoordinated = val),
                     ),
+                    if (_salaryCoordinated) ...[
+                      const SizedBox(height: 4),
+                      TextFormField(
+                        controller: _salaryController,
+                        textAlign: TextAlign.right,
+                        keyboardType: TextInputType.text,
+                        decoration: const InputDecoration(
+                          labelText: 'השכר שנקבע (למשל: 30,000 ש"ח ברוטו / נטו)',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.payments_outlined, color: Colors.teal),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    const Divider(),
+                    const Text('תנאי רכב:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: _vehicleOptions.map((veh) {
+                        final isSel = _vehicleBenefit == veh;
+                        return ChoiceChip(
+                          avatar: Icon(
+                            veh == 'ללא רכב' ? Icons.money_off_rounded : Icons.directions_car_rounded,
+                            size: 16,
+                            color: isSel ? Colors.white : Colors.indigo,
+                          ),
+                          label: Text(veh),
+                          selected: isSel,
+                          selectedColor: Colors.indigo,
+                          labelStyle: TextStyle(
+                            color: isSel ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onSelected: (val) {
+                            if (val) setState(() => _vehicleBenefit = veh);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const Divider(),
+                    const Text('תנאי הסעדה ואש"ל:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: _mealOptions.map((meal) {
+                        final isSel = _mealBenefit == meal;
+                        return ChoiceChip(
+                          avatar: Icon(
+                            meal == 'ללא סבסוד' ? Icons.no_meals_rounded : Icons.restaurant_rounded,
+                            size: 16,
+                            color: isSel ? Colors.white : Colors.deepOrange,
+                          ),
+                          label: Text(meal),
+                          selected: isSel,
+                          selectedColor: Colors.deepOrange,
+                          labelStyle: TextStyle(
+                            color: isSel ? Colors.white : Colors.black87,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onSelected: (val) {
+                            if (val) setState(() => _mealBenefit = meal);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const Divider(),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text('כולל קרן השתלמות?'),
+                      value: _hasStudyFund,
+                      onChanged: (val) => setState(() => _hasStudyFund = val),
+                    ),
+                    if (_hasStudyFund) ...[
+                      const SizedBox(height: 4),
+                      const Text('מועד תחילת ההפרשה:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black87)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        children: _studyFundOptions.map((opt) {
+                          final isSel = _studyFundStart == opt;
+                          return ChoiceChip(
+                            label: Text(opt),
+                            selected: isSel,
+                            selectedColor: Colors.amber.shade700,
+                            labelStyle: TextStyle(
+                              color: isSel ? Colors.white : Colors.black87,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                            onSelected: (val) {
+                              if (val) setState(() => _studyFundStart = opt);
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    const Divider(),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text('משרה היברידית?'),
+                      value: _isHybrid,
+                      onChanged: (val) => setState(() => _isHybrid = val),
+                    ),
+                    if (_isHybrid) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Text('כמה ימים מהבית בשבוע: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                          const Spacer(),
+                          Wrap(
+                            spacing: 4,
+                            children: [1, 2, 3, 4, 5].map((d) {
+                              final sel = _homeDaysPerWeek == d;
+                              return ChoiceChip(
+                                label: Text('$d'),
+                                selected: sel,
+                                onSelected: (s) {
+                                  if (s) setState(() => _homeDaysPerWeek = d);
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    const Divider(),
+                    Row(
+                      children: [
+                        const Text('סה"כ ימי עבודה בשבוע: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        const Spacer(),
+                        Wrap(
+                          spacing: 6,
+                          children: [5, 6].map((days) {
+                            final sel = _totalWorkDaysPerWeek == days;
+                            return ChoiceChip(
+                              label: Text('$days ימים'),
+                              selected: sel,
+                              onSelected: (s) {
+                                if (s) setState(() => _totalWorkDaysPerWeek = days);
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('מסגרת שעות עבודה:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    DropdownButtonFormField<String>(
+                      value: _workHours,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      items: _workHoursOptions.map((h) => DropdownMenuItem(value: h, child: Text(h, style: const TextStyle(fontSize: 13)))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _workHours = val);
+                      },
+                    ),
+                    const Divider(),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      title: const Text('נמסר מבחן בית / משימה מקצועית?'),
+                      value: _hasHomeAssignment,
+                      onChanged: (val) => setState(() => _hasHomeAssignment = val),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
+
               TextFormField(
                 controller: _contactNameController,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
-                  labelText: 'איש / אשת קשר',
+                  labelText: 'שם איש/אשת קשר או מגייס/ת',
                   border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.person_outline),
+                  prefixIcon: Icon(Icons.person_outline),
                 ),
               ),
               const SizedBox(height: 12),
@@ -1305,31 +1319,21 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                 decoration: const InputDecoration(
                   labelText: 'טלפון איש קשר',
                   border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.phone_outlined),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _locationController,
-                textAlign: TextAlign.right,
-                decoration: InputDecoration(
-                  labelText: _platform == 'פרונטלי' ? 'כתובת הגעה / משרד' : 'קישור לפגישה (Zoom / Teams / Meet)',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: Icon(_platform == 'פרונטלי' ? Icons.place_outlined : Icons.link_rounded),
+                  prefixIcon: Icon(Icons.phone_outlined),
                 ),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _notesController,
-                maxLines: 4,
+                maxLines: 3,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
-                  labelText: 'דגשים, תוכן המייל המלא והערות',
+                  labelText: 'דגשים והערות נוספות',
                   border: OutlineInputBorder(),
-                  suffixIcon: Icon(Icons.note_alt_outlined),
+                  prefixIcon: Icon(Icons.note_alt_outlined),
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 24),
               FilledButton(
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.indigo,
@@ -1352,6 +1356,15 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                       isOnline: _platform != 'פרונטלי',
                       hasHomeAssignment: _hasHomeAssignment,
                       salaryCoordinated: _salaryCoordinated,
+                      agreedSalary: _salaryController.text.trim(),
+                      isHybrid: _isHybrid,
+                      homeDaysPerWeek: _homeDaysPerWeek,
+                      totalWorkDaysPerWeek: _totalWorkDaysPerWeek,
+                      workHours: _workHours,
+                      vehicleBenefit: _vehicleBenefit,
+                      hasStudyFund: _hasStudyFund,
+                      studyFundStart: _studyFundStart,
+                      mealBenefit: _mealBenefit,
                     );
                     Navigator.pop(context, newItem);
                   }
