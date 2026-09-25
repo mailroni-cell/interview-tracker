@@ -161,7 +161,6 @@ class InterviewItem {
   String locationOrLink;
   String notes;
   bool isOnline;
-  bool hasHomeAssignment;
   bool salaryCoordinated;
   String agreedSalary;
   bool isHybrid;
@@ -185,7 +184,6 @@ class InterviewItem {
     this.locationOrLink = '',
     this.notes = '',
     this.isOnline = true,
-    this.hasHomeAssignment = false,
     this.salaryCoordinated = false,
     this.agreedSalary = '',
     this.isHybrid = false,
@@ -211,7 +209,6 @@ class InterviewItem {
       'locationOrLink': locationOrLink,
       'notes': notes,
       'isOnline': isOnline,
-      'hasHomeAssignment': hasHomeAssignment,
       'salaryCoordinated': salaryCoordinated,
       'agreedSalary': agreedSalary,
       'isHybrid': isHybrid,
@@ -238,7 +235,6 @@ class InterviewItem {
       locationOrLink: map['locationOrLink'] ?? '',
       notes: map['notes'] ?? '',
       isOnline: map['isOnline'] ?? true,
-      hasHomeAssignment: map['hasHomeAssignment'] ?? false,
       salaryCoordinated: map['salaryCoordinated'] ?? false,
       agreedSalary: map['agreedSalary'] ?? '',
       isHybrid: map['isHybrid'] ?? false,
@@ -782,12 +778,6 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                                   backgroundColor: Colors.grey.shade100,
                                   visualDensity: VisualDensity.compact,
                                 ),
-                                if (item.hasHomeAssignment)
-                                  Chip(
-                                    label: const Text('מבחן בית: הוגש', style: TextStyle(fontSize: 11)),
-                                    backgroundColor: Colors.amber.shade50,
-                                    visualDensity: VisualDensity.compact,
-                                  ),
                               ],
                             ),
                             const SizedBox(height: 8),
@@ -862,7 +852,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
 }
 
 // ----------------------------------------------------
-// טופס מהיר עם שכר, רכב, הסעדה, קרן השתלמות, היברידיות ושעות
+// טופס מהיר ללא גלישת פיקסלים וללא מתג מבחן
 // ----------------------------------------------------
 class InterviewFormScreen extends StatefulWidget {
   final InterviewItem? item;
@@ -886,7 +876,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
   late DateTime _dateTime;
   late String _status;
   late String _platform;
-  late bool _hasHomeAssignment;
   late bool _salaryCoordinated;
   late bool _isHybrid;
   late int _homeDaysPerWeek;
@@ -924,7 +913,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
     _dateTime = item?.dateTime ?? DateTime.now().add(const Duration(days: 1));
     _status = item?.status ?? 'נקבע';
     _platform = item?.platform ?? 'זום';
-    _hasHomeAssignment = item?.hasHomeAssignment ?? false;
     _salaryCoordinated = item?.salaryCoordinated ?? false;
     _isHybrid = item?.isHybrid ?? false;
     _homeDaysPerWeek = item?.homeDaysPerWeek ?? 2;
@@ -1095,7 +1083,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
               ),
               const SizedBox(height: 16),
 
-              // תנאי משרה: שכר, רכב, אש"ל, קרן השתלמות והיברידיות
+              // תנאי משרה ושכר
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -1234,46 +1222,39 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                     ),
                     if (_isHybrid) ...[
                       const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Text('כמה ימים מהבית בשבוע: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                          const Spacer(),
-                          Wrap(
-                            spacing: 4,
-                            children: [1, 2, 3, 4, 5].map((d) {
-                              final sel = _homeDaysPerWeek == d;
-                              return ChoiceChip(
-                                label: Text('$d'),
-                                selected: sel,
-                                onSelected: (s) {
-                                  if (s) setState(() => _homeDaysPerWeek = d);
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ],
+                      const Text('ימים מהבית בשבוע:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        children: [1, 2, 3, 4, 5].map((d) {
+                          final sel = _homeDaysPerWeek == d;
+                          return ChoiceChip(
+                            label: Text('$d ימים'),
+                            selected: sel,
+                            onSelected: (s) {
+                              if (s) setState(() => _homeDaysPerWeek = d);
+                            },
+                          );
+                        }).toList(),
                       ),
                       const SizedBox(height: 10),
                     ],
                     const Divider(),
-                    Row(
-                      children: [
-                        const Text('סה"כ ימי עבודה בשבוע: ', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                        const Spacer(),
-                        Wrap(
-                          spacing: 6,
-                          children: [5, 6].map((days) {
-                            final sel = _totalWorkDaysPerWeek == days;
-                            return ChoiceChip(
-                              label: Text('$days ימים'),
-                              selected: sel,
-                              onSelected: (s) {
-                                if (s) setState(() => _totalWorkDaysPerWeek = days);
-                              },
-                            );
-                          }).toList(),
-                        ),
-                      ],
+                    // תיקון הבאג: הפרדת כותרת ימי העבודה מהכפתורים עם Wrap למניעת גלישה
+                    const Text('סה"כ ימי עבודה בשבוע:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      children: [5, 6].map((days) {
+                        final sel = _totalWorkDaysPerWeek == days;
+                        return ChoiceChip(
+                          label: Text('$days ימים בשבוע'),
+                          selected: sel,
+                          onSelected: (s) {
+                            if (s) setState(() => _totalWorkDaysPerWeek = days);
+                          },
+                        );
+                      }).toList(),
                     ),
                     const SizedBox(height: 12),
                     const Text('מסגרת שעות עבודה:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -1288,14 +1269,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                       onChanged: (val) {
                         if (val != null) setState(() => _workHours = val);
                       },
-                    ),
-                    const Divider(),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                      title: const Text('נמסר מבחן בית / משימה מקצועית?'),
-                      value: _hasHomeAssignment,
-                      onChanged: (val) => setState(() => _hasHomeAssignment = val),
                     ),
                   ],
                 ),
@@ -1354,7 +1327,6 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                       locationOrLink: _locationController.text.trim(),
                       notes: _notesController.text.trim(),
                       isOnline: _platform != 'פרונטלי',
-                      hasHomeAssignment: _hasHomeAssignment,
                       salaryCoordinated: _salaryCoordinated,
                       agreedSalary: _salaryController.text.trim(),
                       isHybrid: _isHybrid,
