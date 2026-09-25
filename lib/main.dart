@@ -147,7 +147,7 @@ class _SplashScreenState extends State<SplashScreen> {
 }
 
 // ----------------------------------------------------
-// מודל נתונים מעודכן
+// מודל נתונים
 // ----------------------------------------------------
 class InterviewItem {
   String id;
@@ -171,7 +171,7 @@ class InterviewItem {
   String vehicleBenefit;
   bool hasStudyFund;
   String studyFundStart;
-  String mealBenefit; // "תן ביס / סיבוס", "חדר אוכל", "אש\"ל / החזר יומי", "ללא סבסוד"
+  String mealBenefit;
 
   InterviewItem({
     required this.id,
@@ -191,7 +191,7 @@ class InterviewItem {
     this.isHybrid = false,
     this.homeDaysPerWeek = 2,
     this.totalWorkDaysPerWeek = 5,
-    this.workHours = 'משרה מלאה (8:00–17:00)',
+    this.workHours = 'משרה מלאה (8:00-17:00)',
     this.vehicleBenefit = 'ללא רכב',
     this.hasStudyFund = false,
     this.studyFundStart = 'מהיום הראשון',
@@ -244,7 +244,7 @@ class InterviewItem {
       isHybrid: map['isHybrid'] ?? false,
       homeDaysPerWeek: map['homeDaysPerWeek'] ?? 2,
       totalWorkDaysPerWeek: map['totalWorkDaysPerWeek'] ?? 5,
-      workHours: map['workHours'] ?? 'משרה מלאה (8:00–17:00)',
+      workHours: map['workHours'] ?? 'משרה מלאה (8:00-17:00)',
       vehicleBenefit: map['vehicleBenefit'] ?? 'ללא רכב',
       hasStudyFund: map['hasStudyFund'] ?? false,
       studyFundStart: map['studyFundStart'] ?? 'מהיום הראשון',
@@ -741,7 +741,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                                   ),
                                 if (item.mealBenefit != 'ללא סבסוד')
                                   Chip(
-                                    avatar: const Icon(Icons.restaurant_rounded, size: 14, color: Colors.deepOrange),
+                                    avatar: const Icon(Icons.fastfood_rounded, size: 14, color: Colors.deepOrange),
                                     label: Text(
                                       item.mealBenefit,
                                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.deepOrange),
@@ -751,10 +751,10 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
                                   ),
                                 if (item.hasStudyFund)
                                   Chip(
-                                    avatar: const Icon(Icons.savings_outlined, size: 14, color: Colors.amber.shade900),
+                                    avatar: const Icon(Icons.savings_outlined, size: 14, color: Colors.amber),
                                     label: Text(
                                       'קרן השתלמות: ${item.studyFundStart}',
-                                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.brown),
                                     ),
                                     backgroundColor: Colors.amber.shade50,
                                     visualDensity: VisualDensity.compact,
@@ -900,11 +900,11 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
   final List<String> _statusOptions = ['נקבע', 'התקיים', 'ממתין לתשובה', 'עבר בהצלחה', 'בוטל/נדחה'];
   final List<String> _platformOptions = ['זום', 'טימס', 'Google Meet', 'פרונטלי'];
   final List<String> _vehicleOptions = ['ללא רכב', 'רכב חברה / ליסינג', 'אחזקת רכב'];
-  final List<String> _mealOptions = ['ללא סבסוד', 'תן ביס / סיבוס', 'חדר אוכל', 'אש"ל / החזר יומי'];
+  final List<String> _mealOptions = ['ללא סבסוד', 'תן ביס / סיבוס', 'חדר אוכל', 'אשל / החזר יומי'];
   final List<String> _studyFundOptions = ['מהיום הראשון', 'אחרי 3 חודשים', 'אחרי 6 חודשים'];
   final List<String> _workHoursOptions = [
-    'משרה מלאה (8:00–17:00)',
-    'משרה מלאה (9:00–18:00)',
+    'משרה מלאה (8:00-17:00)',
+    'משרה מלאה (9:00-18:00)',
     'גמיש / לפי משימות',
     'משמרות / כוננויות'
   ];
@@ -929,7 +929,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
     _isHybrid = item?.isHybrid ?? false;
     _homeDaysPerWeek = item?.homeDaysPerWeek ?? 2;
     _totalWorkDaysPerWeek = item?.totalWorkDaysPerWeek ?? 5;
-    _workHours = item?.workHours ?? 'משרה מלאה (8:00–17:00)';
+    _workHours = item?.workHours ?? 'משרה מלאה (8:00-17:00)';
     _vehicleBenefit = item?.vehicleBenefit ?? 'ללא רכב';
     _hasStudyFund = item?.hasStudyFund ?? false;
     _studyFundStart = item?.studyFundStart ?? 'מהיום הראשון';
@@ -1174,7 +1174,7 @@ class _InterviewFormScreenState extends State<InterviewFormScreen> {
                         final isSel = _mealBenefit == meal;
                         return ChoiceChip(
                           avatar: Icon(
-                            meal == 'ללא סבסוד' ? Icons.no_meals_rounded : Icons.restaurant_rounded,
+                            meal == 'ללא סבסוד' ? Icons.no_meals_rounded : Icons.fastfood_rounded,
                             size: 16,
                             color: isSel ? Colors.white : Colors.deepOrange,
                           ),
